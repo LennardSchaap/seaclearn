@@ -4,9 +4,15 @@ import gym
 import numpy as np
 import torch
 from gym.spaces.box import Box
-from citylearn.citylearn import CityLearnEnv
+from gym.wrappers import Monitor
 
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnvWrapper
+from stable_baselines3.common.vec_env.vec_video_recorder import VecVideoRecorder
+from stable_baselines3.common.vec_env.vec_normalize import VecNormalize as VecNormalize_
+
+from citylearn.citylearn import CityLearnEnv
+from wrappers import TimeLimit, Monitor
+
 
 class MADummyVecEnv(DummyVecEnv):
     def __init__(self, env_fns):
@@ -15,25 +21,41 @@ class MADummyVecEnv(DummyVecEnv):
         # change this because we want >1 reward
         self.buf_rews = np.zeros((self.num_envs, agents), dtype=np.float32)
 
-def make_env(dataset_name, time_limit):
+def make_env(env_id, seed, rank, time_limit, wrappers, monitor_dir):
     def _thunk():
 
-        dataset_name = 'citylearn_challenge_2022_phase_1'
-        env = CityLearnEnv(dataset_name, central_agent=False, time_limit=time_limit)
+        env = CityLearnEnv(env_id, central_agent=False, time_limit=time_limit)
+        env.seed(seed + rank)
+
+        if time_limit:
+            env = TimeLimit(env, time_limit)
+        for wrapper in wrappers:
+            env = wrapper(env)
+        
+        if monitor_dir:
+            env = Monitor(env, monitor_dir, lambda ep: int(ep==0), force=True, uid=str(rank))
 
         return env
 
     return _thunk
 
-def make_vec_envs(dataset_name, parallel, time_limit, device):
+
+def make_vec_envs(
+    env_name, seed, parallel, time_limit, wrappers, device, monitor_dir=None
+):
     envs = [
-        make_env(dataset_name, time_limit) for i in range(parallel)
+        make_env(env_name, seed, i, time_limit, wrappers,monitor_dir) for i in range(parallel)
     ]
 
-    envs = SubprocVecEnv(envs, start_method="fork")
+    if len(envs) == 1 or monitor_dir:
+        envs = MADummyVecEnv(envs)
+    else:
+        envs = SubprocVecEnv(envs, start_method="fork")
+
 
     envs = VecPyTorch(envs, device)
     return envs
+
 
 class VecPyTorch(VecEnvWrapper):
     def __init__(self, venv, device):

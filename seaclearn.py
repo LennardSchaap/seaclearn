@@ -1,32 +1,42 @@
 from stable_baselines3.sac import SAC
 from citylearn.citylearn import CityLearnEnv
+from wrappers import RecordEpisodeStatistics, SquashDones
 import torch
 
 from envs import make_vec_envs
 from a2c import A2C
 
 dataset_name = 'citylearn_challenge_2022_phase_1'
-num_procs = 4
+num_procs = 1
 time_limit = 1000
 device = "cpu"
+seed = 42
+wrappers = (
+        RecordEpisodeStatistics,
+        SquashDones,
+    )
 
-envs = make_vec_envs(dataset_name, num_procs, time_limit, device)
+torch.set_num_threads(1)
+envs = make_vec_envs(dataset_name, seed, num_procs, time_limit, wrappers, device, monitor_dir=None)
 
-# for obs in env.observation_space:
-#     print(obs.shape)
-# print(env.observation_names[0])
-# print(len(env.observation_names[0]))
-# env = NormalizedObservationWrapper(env)
-# env = StableBaselines3Wrapper(env)
 agents = [
         A2C(i, osp, asp)
         for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space))
     ]
-print(len(agents))
+
 obs = envs.reset()
 
-print(obs)
+# observation = torch.stack(obs).moveaxis(0,1)
+# test = list(observation)
+# obs = test
+
 print(len(obs))
+print(obs)
+
+# TODO: Multithreading werkt niet???, daarom is obs niet verdeeld over 4 processen en is het een 4x5x28
+
+print("thread")
+
 for i in range(len(obs)):
     agents[i].storage.obs[0].copy_(obs[i])
     agents[i].storage.to(device)
@@ -47,17 +57,3 @@ for step in range(10):
     # Obser reward and next obs
     obs, reward, done, infos = envs.step(n_action)
 
-
-# model.learn(total_timesteps=env.time_steps*2)
-
-# # evaluate
-# observations = env.reset()
-
-# while not env.done:
-#     actions, _ = model.predict(observations, deterministic=True)
-#     observations, _, _, _ = env.step(actions)
-
-# kpis = env.evaluate()
-# kpis = kpis.pivot(index='cost_function', columns='name', values='value')
-# kpis = kpis.dropna(how='all')
-# print(kpis)

@@ -33,7 +33,7 @@ class A2C:
 
         seac_coef = 1.0,
 
-        num_processes = 1,
+        num_processes = 4,
         num_steps = 5,
 
         device = "cpu"
@@ -47,6 +47,8 @@ class A2C:
         self.model = Policy(
             obs_space, action_space, base_kwargs={"recurrent": recurrent_policy},
         )
+
+        print("obs_space: ", obs_space.shape)
 
         self.storage = RolloutStorage(
             obs_space,
