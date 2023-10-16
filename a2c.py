@@ -43,12 +43,9 @@ class A2C:
         self.action_size = flatdim(action_space)
         self.obs_space = obs_space
         self.action_space = action_space
-
         self.model = Policy(
             obs_space, action_space, base_kwargs={"recurrent": recurrent_policy},
         )
-
-        print("obs_space: ", obs_space.shape)
 
         self.storage = RolloutStorage(
             obs_space,
