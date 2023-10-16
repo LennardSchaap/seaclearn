@@ -46,23 +46,6 @@ def main():
         agents[i].storage.obs[0].copy_(obs[i])
         agents[i].storage.to(device)
 
-    # for step in range(10):
-    #     with torch.no_grad():
-    #         n_value, n_action, n_recurrent_hidden_states = zip(
-    #             *[
-    #                 agent.model.act(
-    #                     agent.storage.obs[step],
-    #                     agent.storage.recurrent_hidden_states[step],
-    #                     agent.storage.masks[step],
-    #                 )
-    #                 for agent in agents
-    #             ]
-    #         )
-    #         print(n_action)
-    #     # Obser reward and next obs
-    #     obs, reward, done, infos = envs.step(n_action)
-
-
     num_updates = (
         int(num_env_steps) // num_steps // num_procs
     )
