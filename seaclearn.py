@@ -40,8 +40,6 @@ def main():
     # print(obs)
     # print(len(obs))
 
-    # TODO: Multithreading werkt niet???, daarom is obs niet verdeeld over 4 processen en is het een 4x5x28
-
     for i in range(len(obs)):
         agents[i].storage.obs[0].copy_(obs[i])
         agents[i].storage.to(device)
