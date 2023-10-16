@@ -1,6 +1,6 @@
 from stable_baselines3.sac import SAC
 from citylearn.citylearn import CityLearnEnv
-from wrappers import RecordEpisodeStatistics, SquashDones
+from wrappers import RecordEpisodeStatistics, SquashDones, FlattenObservation
 import torch
 
 from envs import make_vec_envs
@@ -12,15 +12,26 @@ def main():
     dataset_name = 'citylearn_challenge_2022_phase_1'
     num_procs = 2
     time_limit = 1000
-    device = "cpu"
     seed = 42
 
+    gamma = 0.99
+    use_gae = False
+    gae_lambda = 0.95
+    use_proper_time_limits = True
+
+    value_loss_coef = 0.5
+    entropy_coef = 0.01
+    seac_coef = 1.0
+    max_grad_norm = 0.5
+    device = "cpu"
+    
     num_steps = 5
     num_env_steps = 10000
     
     wrappers = (
-            RecordEpisodeStatistics,
-            SquashDones,
+            FlattenObservation,
+            # RecordEpisodeStatistics,
+            # SquashDones,
         )
 
     torch.set_num_threads(1)
@@ -82,7 +93,7 @@ def main():
                     obs[i],
                     n_recurrent_hidden_states[i],
                     n_action[i],
-                    None,
+                    # None,
                     n_value[i],
                     reward[:, i].unsqueeze(1),
                     masks,
@@ -91,10 +102,10 @@ def main():
 
         # value_loss, action_loss, dist_entropy = agent.update(rollouts)
         for agent in agents:
-            agent.compute_returns()
+            agent.compute_returns(use_gae, gamma, gae_lambda, use_proper_time_limits)
 
         for agent in agents:
-            loss = agent.update([a.storage for a in agents])
+            loss = agent.update([a.storage for a in agents], value_loss_coef, entropy_coef, seac_coef, max_grad_norm, device)
 
         for agent in agents:
             agent.storage.after_update()
