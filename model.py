@@ -38,6 +38,17 @@ class Policy(nn.Module):
     def get_value(self, inputs, rnn_hxs, masks):
         value, _, _ = self.model(inputs, rnn_hxs, masks)
         return value
+    
+    def evaluate_actions(self, inputs, rnn_hxs, masks, action): 
+        value, actor_features, rnn_hxs = self.model(inputs, rnn_hxs, masks)
+
+        # dist = self.dist(actor_features)
+
+        # action_log_probs = dist.log_probs(action)
+        # dist_entropy = dist.entropy().mean()
+
+        # return value, action_log_probs, dist_entropy, rnn_hxs
+        return value, None, None, rnn_hxs
 
 class NNBase(nn.Module):
     def __init__(self, recurrent, recurrent_input_size, hidden_size):

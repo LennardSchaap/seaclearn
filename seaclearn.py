@@ -1,16 +1,17 @@
-from stable_baselines3.sac import SAC
-from citylearn.citylearn import CityLearnEnv
+
 from wrappers import RecordEpisodeStatistics, SquashDones, FlattenObservation
 import torch
 
 from envs import make_vec_envs
 from a2c import A2C
 
+import matplotlib.pyplot as plt
+
 
 def main():
 
     dataset_name = 'citylearn_challenge_2022_phase_1'
-    num_procs = 2
+    num_procs = 4
     time_limit = 1000
     seed = 42
 
@@ -26,7 +27,7 @@ def main():
     device = "cpu"
     
     num_steps = 5
-    num_env_steps = 10000
+    num_env_steps = 1000000
     
     wrappers = (
             FlattenObservation,
@@ -43,6 +44,7 @@ def main():
         ]
 
     obs = envs.reset()
+    policy_losses, value_losses = [], []
 
     # observation = torch.stack(obs).moveaxis(0,1)
     # test = list(observation)
@@ -80,14 +82,14 @@ def main():
             # envs.envs[0].render()
 
             # If done then clean the history of observations.
-            masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
+            # masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
 
-            bad_masks = torch.FloatTensor(
-                [
-                    [0.0] if info.get("TimeLimit.truncated", False) else [1.0]
-                    for info in infos
-                ]
-            )
+            # bad_masks = torch.FloatTensor(
+            #     [
+            #         [0.0] if info.get("TimeLimit.truncated", False) else [1.0]
+            #         for info in infos
+            #     ]
+            # )
             for i in range(len(agents)):
                 agents[i].storage.insert(
                     obs[i],
@@ -96,21 +98,32 @@ def main():
                     # None,
                     n_value[i],
                     reward[:, i].unsqueeze(1),
-                    masks,
-                    bad_masks,
+                    # masks,
+                    # bad_masks,
                 )
 
         # value_loss, action_loss, dist_entropy = agent.update(rollouts)
         for agent in agents:
             agent.compute_returns(use_gae, gamma, gae_lambda, use_proper_time_limits)
 
+        total_policy_loss, total_value_loss = 0, 0
         for agent in agents:
             loss = agent.update([a.storage for a in agents], value_loss_coef, entropy_coef, seac_coef, max_grad_norm, device)
+            total_policy_loss += loss['seac_policy_loss']
+            total_value_loss += loss['seac_value_loss']
+        policy_losses.append(total_policy_loss)
+        value_losses.append(total_value_loss)
 
         for agent in agents:
             agent.storage.after_update()
 
-        envs.close()
+    envs.close()
+
+    # plt.plot(policy_losses, label='policy loss')
+    plt.plot(value_losses, label='value loss')
+    plt.legend()
+    plt.ylim(0,10000)
+    plt.savefig("test_run.png")
 
 if __name__ == '__main__':
     main()

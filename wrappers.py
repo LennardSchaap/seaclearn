@@ -1,5 +1,4 @@
 
-import math
 from collections import deque
 from time import perf_counter
 
@@ -101,7 +100,7 @@ class TimeLimit(GymTimeLimit):
         observation, reward, done, info = self.env.step(action)
         self._elapsed_steps += 1
         if self._elapsed_steps >= self._max_episode_steps:
-            info['TimeLimit.truncated'] = not all(done)
+            # info['TimeLimit.truncated'] = not all(done)
             done = len(observation) * [True]
         return observation, reward, done, info
 

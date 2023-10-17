@@ -1,7 +1,6 @@
 import glob
 import os
 import numpy as np
-import torch
 import torch.nn as nn
 
 def init(module, weight_init, bias_init, gain=1):

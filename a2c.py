@@ -7,7 +7,6 @@ import torch.nn.functional as F
 
 import numpy as np
 
-import gym
 from model import Policy
 from gym.spaces.utils import flatdim
 from storage import RolloutStorage
@@ -108,11 +107,12 @@ class A2C:
         )
 
         values = values.view(num_steps, num_processes, 1)
-        action_log_probs = action_log_probs.view(num_steps, num_processes, 1)
+        # action_log_probs = action_log_probs.view(num_steps, num_processes, 1)
 
         advantages = self.storage.returns[:-1] - values
 
-        policy_loss = -(advantages.detach() * action_log_probs).mean()
+        # policy_loss = -(advantages.detach() * action_log_probs).mean()
+        policy_loss = -(advantages.detach()).mean()
         value_loss = advantages.pow(2).mean()
 
 
@@ -131,27 +131,29 @@ class A2C:
                 storages[oid].actions.view(-1, action_shape),
             )
             other_values = other_values.view(num_steps, num_processes, 1)
-            logp = logp.view(num_steps, num_processes, 1)
+            # logp = logp.view(num_steps, num_processes, 1)
             other_advantage = (
                 storages[oid].returns[:-1] - other_values
             )  # or storages[oid].rewards
 
-            importance_sampling = (
-                logp.exp() / (storages[oid].action_log_probs.exp() + 1e-7)
-            ).detach()
-            # importance_sampling = 1.0
+            # importance_sampling = (
+            #     logp.exp() / (storages[oid].action_log_probs.exp() + 1e-7)
+            # ).detach()
+            importance_sampling = 1.0 # This was commented out before
+            
             seac_value_loss += (
                 importance_sampling * other_advantage.pow(2)
             ).mean()
             seac_policy_loss += (
-                -importance_sampling * logp * other_advantage.detach()
+                # -importance_sampling * logp * other_advantage.detach()
+                -importance_sampling * other_advantage.detach()
             ).mean()
 
         self.optimizer.zero_grad()
         (
             policy_loss
             + value_loss_coef * value_loss
-            - entropy_coef * dist_entropy
+            # - entropy_coef * dist_entropy
             + seac_coef * seac_policy_loss
             + seac_coef * value_loss_coef * seac_value_loss
         ).backward()
@@ -163,8 +165,8 @@ class A2C:
         return {
             "policy_loss": policy_loss.item(),
             "value_loss": value_loss_coef * value_loss.item(),
-            "dist_entropy": entropy_coef * dist_entropy.item(),
-            "importance_sampling": importance_sampling.mean().item(),
+            # "dist_entropy": entropy_coef * dist_entropy.item(),
+            # "importance_sampling": importance_sampling.mean().item(),
             "seac_policy_loss": seac_coef * seac_policy_loss.item(),
             "seac_value_loss": seac_coef
             * value_loss_coef
