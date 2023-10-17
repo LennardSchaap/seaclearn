@@ -1,4 +1,3 @@
-
 import math
 from collections import deque
 from time import perf_counter
@@ -16,8 +15,7 @@ class RecordEpisodeStatistics(gym.Wrapper):
     def __init__(self, env, deque_size=100):
         super().__init__(env)
         self.t0 = perf_counter()
-        # print(len(env.buildings))
-        self.episode_reward = np.zeros(len(env.buildings))
+        self.episode_reward = np.zeros(self.n_agents)
         self.episode_length = 0
         self.reward_queue = deque(maxlen=deque_size)
         self.length_queue = deque(maxlen=deque_size)
@@ -102,7 +100,7 @@ class TimeLimit(GymTimeLimit):
         observation, reward, done, info = self.env.step(action)
         self._elapsed_steps += 1
         if self._elapsed_steps >= self._max_episode_steps:
-            info['TimeLimit.truncated'] = not all(done)
+            # info['TimeLimit.truncated'] = not all(done)
             done = len(observation) * [True]
         return observation, reward, done, info
 
