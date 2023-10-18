@@ -4,7 +4,7 @@ from time import perf_counter
 
 import gym
 import numpy as np
-from gym import ObservationWrapper, spaces
+from gym import ObservationWrapper, spaces, ActionWrapper
 from gym.wrappers import TimeLimit as GymTimeLimit
 from gym.wrappers import Monitor as GymMonitor
 
@@ -69,6 +69,34 @@ class FlattenObservation(ObservationWrapper):
         return tuple([
             spaces.flatten(obs_space, obs)
             for obs_space, obs in zip(self.env.observation_space, observation)
+        ])
+
+
+class FlattenAction(ActionWrapper):
+    r"""Action wrapper that flattens the actions of individual agents."""
+
+    def __init__(self, env):
+        super(FlattenAction, self).__init__(env)
+
+        ma_spaces = []
+
+        for sa_act in env.action_space:
+            flatdim = spaces.flatdim(sa_act)
+            ma_spaces += [
+                spaces.Box(
+                    low=-float("inf"),
+                    high=float("inf"),
+                    shape=(flatdim,),
+                    dtype=np.float32,
+                )
+            ]
+
+        self.action_space = spaces.Tuple(tuple(ma_spaces))
+
+    def action(self, action):
+        return tuple([
+            spaces.flatten(act_space, act)
+            for act_space, act in zip(self.env.action_space, action)
         ])
 
 

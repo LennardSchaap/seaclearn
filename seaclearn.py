@@ -1,5 +1,5 @@
 
-from wrappers import RecordEpisodeStatistics, SquashDones, FlattenObservation
+from wrappers import RecordEpisodeStatistics, SquashDones, FlattenObservation, FlattenAction
 import torch
 
 from envs import make_vec_envs
@@ -31,6 +31,7 @@ def main():
     
     wrappers = (
             FlattenObservation,
+            FlattenAction,
             # RecordEpisodeStatistics,
             # SquashDones,
         )
@@ -60,7 +61,7 @@ def main():
     num_updates = (
         int(num_env_steps) // num_steps // num_procs
     )
-    print(num_updates)
+
     for j in range(1, num_updates + 1):
 
         for step in range(num_steps):
@@ -79,7 +80,9 @@ def main():
 
             # Obser reward and next obs
             print(n_action)
+
             obs, reward, done, infos = envs.step(n_action)
+            return
             # envs.envs[0].render()
 
             # If done then clean the history of observations.
