@@ -50,8 +50,7 @@ def make_vec_envs(
     if len(envs) == 1 or monitor_dir:
         envs = MADummyVecEnv(envs)
     else:
-        envs = SubprocVecEnv(envs, start_method="fork")
-
+        envs = SubprocVecEnv(envs, start_method="spawn")
 
     envs = VecPyTorch(envs, device)
     return envs
