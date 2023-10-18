@@ -11,7 +11,7 @@ import numpy as np
 def main():
 
     dataset_name = 'citylearn_challenge_2022_phase_1'
-    num_procs = 4
+    num_procs = 2
     time_limit = 1000
     seed = 42
 
