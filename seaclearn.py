@@ -6,12 +6,12 @@ from envs import make_vec_envs
 from a2c import A2C
 
 import matplotlib.pyplot as plt
-
+import numpy as np
 
 def main():
 
     dataset_name = 'citylearn_challenge_2022_phase_1'
-    num_procs = 8
+    num_procs = 4
     time_limit = 1000
     seed = 42
 
@@ -27,7 +27,7 @@ def main():
     device = "cpu"
     
     num_steps = 5
-    num_env_steps = 1000000
+    num_env_steps = 10000000
     
     wrappers = (
             FlattenObservation,
@@ -60,7 +60,7 @@ def main():
     num_updates = (
         int(num_env_steps) // num_steps // num_procs
     )
-
+    print(num_updates)
     for j in range(1, num_updates + 1):
 
         for step in range(num_steps):
@@ -78,6 +78,7 @@ def main():
                 )
 
             # Obser reward and next obs
+            print(n_action)
             obs, reward, done, infos = envs.step(n_action)
             # envs.envs[0].render()
 
@@ -117,13 +118,13 @@ def main():
         for agent in agents:
             agent.storage.after_update()
 
-    envs.close()
+        if j % 10 == 0:
+            print(f'update {j}')
 
-    # plt.plot(policy_losses, label='policy loss')
-    plt.plot(value_losses, label='value loss')
-    plt.legend()
-    plt.ylim(0,10000)
-    plt.savefig("test_run.png")
+    envs.close()
+   
+    value_losses = np.array(value_losses)
+    np.save('valueloss_testrun.npy', value_losses)
 
 if __name__ == '__main__':
     main()
