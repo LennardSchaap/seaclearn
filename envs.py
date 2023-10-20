@@ -23,8 +23,9 @@ class MADummyVecEnv(DummyVecEnv):
 
 def make_env(env_id, seed, rank, time_limit, wrappers, monitor_dir):
     def _thunk():
-
-        env = CityLearnEnv(env_id, central_agent=False, time_limit=time_limit)
+        np.random.seed(seed + rank)
+        start_pos = np.random.randint(0, 8759-time_limit) # citylearn challenge data length is 8759, baeda_3dem is shorter (~2000)
+        env = CityLearnEnv(env_id, central_agent=False, simulation_start_time_step=start_pos, random_seed=seed+rank)
         env.seed(seed + rank)
 
         if time_limit:

@@ -34,7 +34,7 @@ device = "cpu"
 
 # Environment settings
 num_steps = 5
-num_env_steps = 2000
+num_env_steps = 1000
 
 # Environment wrappers
 wrappers = (
@@ -159,31 +159,39 @@ def evaluate(agents):
     eval_envs = make_vec_envs(dataset_name, seed, num_procs, time_limit, wrappers, device, monitor_dir=None)
     n_obs = eval_envs.reset()
 
-    num_updates = (
-        int(num_env_steps) // num_steps // num_procs
-    )
+    evaluation_eps = 9000
 
-    for j in range(1, num_updates + 1):
-        for step in range(num_steps):
-            with torch.no_grad():
-                n_value, n_action, n_recurrent_hidden_states = zip(
-                    *[
-                        agent.model.act(
-                            agent.storage.obs[step],
-                            agent.storage.recurrent_hidden_states[step],
-                            agent.storage.masks[step],
-                        )
-                        for agent in agents
-                    ]
-                )
+    n_recurrent_hidden_states = [
+        torch.zeros(
+            evaluation_eps, agent.model.recurrent_hidden_state_size, device=device
+        )
+        for agent in agents
+    ]
+    masks = torch.zeros(evaluation_eps, 1, device=device)
 
-                n_obs, _, done, infos = eval_envs.step(n_action)
+    for _ in range(evaluation_eps):
+        with torch.no_grad():
+            _, n_action, n_recurrent_hidden_states = zip(
+                *[
+                    agent.model.act(
+                        n_obs[agent.agent_id], recurrent_hidden_states, masks
+                    )
+                    for agent, recurrent_hidden_states in zip(
+                        agents, n_recurrent_hidden_states
+                    )
+                ]
+            )
+        
+        n_obs, rewards, done, infos = eval_envs.step(n_action)
 
     #TODO: Correctly evaluate vectorized envs...
     kpis = eval_envs.env_method("evaluate", baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV, indices=0)[0]
     kpis = kpis.pivot(index='cost_function', columns='name', values='value')
     kpis = kpis.dropna(how='all')
     print(kpis)
+
+    eval_envs.close()
+
 
 def main():
 
@@ -193,23 +201,23 @@ def main():
     obs = envs.reset()
 
     # Initialize agents
-    agents = init_agents(envs, obs)
+    # agents = init_agents(envs, obs)
 
     # Train models
-    agents, policy_losses, value_losses = train(agents, envs)
+    # agents, policy_losses, value_losses = train(agents, envs)
 
     # Save trained models
-    save_agents(agents)
+    # save_agents(agents)
 
-    envs.close()
+    # envs.close()
 
-    # # Evaluate agents
-    # agent_dir = "2023-10-18_18-26-34"
-    # agents = load_agents(envs, agent_dir)
-    # evaluate(agents)
+    # Evaluate agents
+    agent_dir = "2023-10-20_14-21-24"
+    agents = load_agents(envs, agent_dir)
+    evaluate(agents)
    
-    value_losses = np.array(value_losses)
-    np.save('valueloss_testrun.npy', value_losses)
+    # value_losses = np.array(value_losses)
+    # np.save('valueloss_testrun.npy', value_losses)
 
 if __name__ == '__main__':
     main()
