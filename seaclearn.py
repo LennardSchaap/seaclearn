@@ -27,7 +27,6 @@ use_proper_time_limits = True
 
 # Training params
 value_loss_coef = 0.5
-entropy_coef = 0.01
 seac_coef = 1.0
 max_grad_norm = 0.5
 device = "cpu"
@@ -59,6 +58,9 @@ def init_agents(envs, obs):
 
 # Train agents
 def train(agents, envs):
+
+    # use global variance
+    global variance
 
     policy_losses, value_losses, rewards = [], [], []
 
@@ -114,7 +116,7 @@ def train(agents, envs):
 
         total_policy_loss, total_value_loss = 0, 0
         for agent in agents:
-            loss = agent.update([a.storage for a in agents], value_loss_coef, entropy_coef, seac_coef, max_grad_norm, device)
+            loss = agent.update([a.storage for a in agents], value_loss_coef, seac_coef, max_grad_norm, device)
             total_policy_loss += loss['seac_policy_loss']
             total_value_loss += loss['seac_value_loss']
         policy_losses.append(total_policy_loss)
@@ -126,6 +128,11 @@ def train(agents, envs):
 
         if j % 10 == 0:
             print(f'update {j}')
+            print('variance', variance)
+
+        variance *= 0.99999
+        variance = max(0.01, variance)
+       
 
     return agents, policy_losses, value_losses, rewards
 
