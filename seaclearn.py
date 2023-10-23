@@ -42,6 +42,7 @@ wrappers = (
     FlattenAction,
 )
 
+
 # Initialize agents
 def init_agents(envs, obs):
 
@@ -55,6 +56,7 @@ def init_agents(envs, obs):
         agents[i].storage.to(device)
 
     return agents
+
 
 # Train agents
 def train(agents, envs):
@@ -132,9 +134,9 @@ def train(agents, envs):
 
         variance *= 0.99999
         variance = max(0.01, variance)
-       
 
     return agents, policy_losses, value_losses, rewards
+
 
 # Save agent models
 def save_agents(agents):
@@ -149,6 +151,7 @@ def save_agents(agents):
         os.makedirs(save_at, exist_ok=True)
         agent.save(save_at)
 
+
 # Load agent models
 def load_agents(envs, agent_dir):
     agents = []
@@ -162,6 +165,7 @@ def load_agents(envs, agent_dir):
         agents.append(agent)
 
     return agents
+
 
 # Evaluate agents
 def evaluate(agents):
