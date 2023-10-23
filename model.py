@@ -30,8 +30,18 @@ class Policy(nn.Module):
     def forward(self, inputs, rnn_hxs, masks):
         raise NotImplementedError
 
-    def act(self, inputs, rnn_hxs, masks, deterministic=False):
+    def add_noise(self, action, variance):
+
+        noise = (variance**0.5)*torch.randn_like(action)
+        action += noise
+        action = torch.clamp(action, -1, 1)
+
+        return action
+
+    def act(self, inputs, rnn_hxs, masks, variance, deterministic=False):
         value, action, rnn_hxs = self.model(inputs, rnn_hxs, masks)
+
+        action = self.add_noise(action, variance)
 
         return value, action, rnn_hxs
 

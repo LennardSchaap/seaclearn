@@ -15,7 +15,7 @@ from citylearn.citylearn import CityLearnEnv, EvaluationCondition
 
 # Dataset information
 dataset_name = 'citylearn_challenge_2022_phase_1'
-num_procs = 8
+num_procs = 4
 time_limit = 1000
 seed = 42
 
@@ -31,10 +31,11 @@ entropy_coef = 0.01
 seac_coef = 1.0
 max_grad_norm = 0.5
 device = "cpu"
+variance = 0.5
 
 # Environment settings
 num_steps = 5
-num_env_steps = 1000
+num_env_steps = 1000000
 
 # Environment wrappers
 wrappers = (
@@ -59,7 +60,7 @@ def init_agents(envs, obs):
 # Train agents
 def train(agents, envs):
 
-    policy_losses, value_losses = [], []
+    policy_losses, value_losses, rewards = [], [], []
 
     num_updates = (
         int(num_env_steps) // num_steps // num_procs
@@ -76,13 +77,14 @@ def train(agents, envs):
                             agent.storage.obs[step],
                             agent.storage.recurrent_hidden_states[step],
                             agent.storage.masks[step],
+                            variance
                         )
                         for agent in agents
                     ]
                 )
 
             obs, reward, done, infos = envs.step(n_action)
-
+            
             # envs.envs[0].render()
 
             # If done then clean the history of observations.
@@ -117,14 +119,15 @@ def train(agents, envs):
             total_value_loss += loss['seac_value_loss']
         policy_losses.append(total_policy_loss)
         value_losses.append(total_value_loss)
-
+        rewards.append(np.array(reward).sum(axis=1).mean())
+        
         for agent in agents:
             agent.storage.after_update()
 
         if j % 10 == 0:
             print(f'update {j}')
 
-    return agents, policy_losses, value_losses
+    return agents, policy_losses, value_losses, rewards
 
 # Save agent models
 def save_agents(agents):
@@ -159,7 +162,7 @@ def evaluate(agents):
     eval_envs = make_vec_envs(dataset_name, seed, num_procs, time_limit, wrappers, device, monitor_dir=None)
     n_obs = eval_envs.reset()
 
-    evaluation_eps = 9000
+    evaluation_eps = 1000
 
     n_recurrent_hidden_states = [
         torch.zeros(
@@ -201,23 +204,26 @@ def main():
     obs = envs.reset()
 
     # Initialize agents
-    # agents = init_agents(envs, obs)
+    agents = init_agents(envs, obs)
 
     # Train models
-    # agents, policy_losses, value_losses = train(agents, envs)
+    agents, policy_losses, value_losses, rewards = train(agents, envs)
 
     # Save trained models
-    # save_agents(agents)
+    save_agents(agents)
 
-    # envs.close()
+    envs.close()
 
     # Evaluate agents
-    agent_dir = "2023-10-20_14-21-24"
-    agents = load_agents(envs, agent_dir)
-    evaluate(agents)
+    # agent_dir = "2023-10-20_14-21-24"
+    # agents = load_agents(envs, agent_dir)
+    # evaluate(agents)
    
-    # value_losses = np.array(value_losses)
-    # np.save('valueloss_testrun.npy', value_losses)
+
+    value_losses = np.array(value_losses)
+    rewards = np.array(rewards)
+    np.save('valueloss_test_experiment.npy', value_losses)
+    np.save('rewards_test_experiment.npy', rewards)
 
 if __name__ == '__main__':
     main()
