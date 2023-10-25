@@ -21,10 +21,16 @@ class MADummyVecEnv(DummyVecEnv):
         # change this because we want >1 reward
         self.buf_rews = np.zeros((self.num_envs, agents), dtype=np.float32)
 
-def make_env(env_id, seed, rank, time_limit, wrappers, monitor_dir):
+def make_env(env_id, seed, rank, time_limit, random_start_pos, min_episode_length, wrappers, monitor_dir):
+
     def _thunk():
 
-        env = CityLearnEnv(env_id, central_agent=False, time_limit=time_limit)
+        if random_start_pos:
+            np.random.seed(seed + rank)
+            start_pos = np.random.randint(0, 8759-min_episode_length) # citylearn challenge data length is 8759, baeda_3dem is shorter (~2000)
+        else:
+            start_pos = 0
+        env = CityLearnEnv(env_id, central_agent=False, simulation_start_time_step=start_pos, random_seed=seed+rank)
         env.seed(seed + rank)
 
         if time_limit:
@@ -41,10 +47,10 @@ def make_env(env_id, seed, rank, time_limit, wrappers, monitor_dir):
 
 
 def make_vec_envs(
-    env_name, seed, parallel, time_limit, wrappers, device, monitor_dir=None
+    env_name, seed, parallel, time_limit, random_start_pos, min_episode_length, wrappers, device, monitor_dir=None
 ):
     envs = [
-        make_env(env_name, seed, i, time_limit, wrappers,monitor_dir) for i in range(parallel)
+        make_env(env_name, seed, i, time_limit, random_start_pos, min_episode_length, wrappers, monitor_dir) for i in range(parallel)
     ]
 
     if len(envs) == 1 or monitor_dir:

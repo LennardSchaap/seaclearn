@@ -1,4 +1,5 @@
 from wrappers import RecordEpisodeStatistics, SquashDones, FlattenObservation, FlattenAction
+from citylearn.wrappers import NormalizedSpaceWrapper
 import torch
 import os
 import datetime
@@ -15,7 +16,7 @@ from citylearn.citylearn import CityLearnEnv, EvaluationCondition
 
 # Dataset information
 dataset_name = 'citylearn_challenge_2022_phase_1'
-num_procs = 8
+num_procs = 4
 time_limit = 1000
 seed = 42
 
@@ -27,20 +28,22 @@ use_proper_time_limits = True
 
 # Training params
 value_loss_coef = 0.5
-entropy_coef = 0.01
 seac_coef = 1.0
 max_grad_norm = 0.5
 device = "cpu"
+variance = 0.5
 
 # Environment settings
 num_steps = 5
-num_env_steps = 2000
+num_env_steps = 10000000
 
 # Environment wrappers
 wrappers = (
+    # NormalizedSpaceWrapper, # TODO: Do this on the data itself
     FlattenObservation,
     FlattenAction,
 )
+
 
 # Initialize agents
 def init_agents(envs, obs):
@@ -56,14 +59,19 @@ def init_agents(envs, obs):
 
     return agents
 
+
 # Train agents
 def train(agents, envs):
 
-    policy_losses, value_losses = [], []
+    # use global variance
+    global variance
+
+    policy_losses, value_losses, rewards = [], [], []
 
     num_updates = (
         int(num_env_steps) // num_steps // num_procs
     )
+    print(num_updates)
 
     for j in range(1, num_updates + 1):
 
@@ -76,13 +84,14 @@ def train(agents, envs):
                             agent.storage.obs[step],
                             agent.storage.recurrent_hidden_states[step],
                             agent.storage.masks[step],
+                            variance
                         )
                         for agent in agents
                     ]
                 )
 
             obs, reward, done, infos = envs.step(n_action)
-
+            
             # envs.envs[0].render()
 
             # If done then clean the history of observations.
@@ -106,25 +115,30 @@ def train(agents, envs):
                     # bad_masks,
                 )
 
-        # value_loss, action_loss, dist_entropy = agent.update(rollouts)
         for agent in agents:
             agent.compute_returns(use_gae, gamma, gae_lambda, use_proper_time_limits)
 
         total_policy_loss, total_value_loss = 0, 0
         for agent in agents:
-            loss = agent.update([a.storage for a in agents], value_loss_coef, entropy_coef, seac_coef, max_grad_norm, device)
+            loss = agent.update([a.storage for a in agents], value_loss_coef, seac_coef, max_grad_norm, device)
             total_policy_loss += loss['seac_policy_loss']
             total_value_loss += loss['seac_value_loss']
         policy_losses.append(total_policy_loss)
         value_losses.append(total_value_loss)
-
+        rewards.append(np.array(reward).sum(axis=1).mean())
+        
         for agent in agents:
             agent.storage.after_update()
 
         if j % 10 == 0:
             print(f'update {j}')
+            print('variance', variance)
 
-    return agents, policy_losses, value_losses
+        variance *= 0.99999
+        variance = max(0.01, variance)
+
+    return agents, policy_losses, value_losses, rewards
+
 
 # Save agent models
 def save_agents(agents):
@@ -138,6 +152,7 @@ def save_agents(agents):
         save_at = path.join(save_dir, f"agent{agent.agent_id}")
         os.makedirs(save_at, exist_ok=True)
         agent.save(save_at)
+
 
 # Load agent models
 def load_agents(envs, agent_dir):
@@ -153,22 +168,38 @@ def load_agents(envs, agent_dir):
 
     return agents
 
+
 # Evaluate agents
 def evaluate(agents):
 
-    eval_envs = make_vec_envs(dataset_name, seed, num_procs, time_limit, wrappers, device, monitor_dir=None)
+    eval_envs = make_vec_envs(env_name=dataset_name,
+                              seed=seed,
+                              parallel=num_procs,
+                              time_limit=None, # time_limit=time_limit,
+                              random_start_pos=False,
+                              min_episode_length=1000, # only when using random_start_pos
+                              wrappers=wrappers,
+                              device=device,
+                              monitor_dir=None
+                              )
     n_obs = eval_envs.reset()
 
-    num_updates = (
-        int(num_env_steps) // num_steps // num_procs
-    )
+    ep_length = 1000
+    n_recurrent_hidden_states = [
+        torch.zeros(
+            ep_length, agent.model.recurrent_hidden_state_size, device=device
+        )
+        for agent in agents
+    ]
+    masks = torch.zeros(ep_length, 1, device=device)
 
-    while len(all_infos) < episodes_per_eval:
+    done = np.array([False for _ in range(num_procs)])
+    for _ in range(ep_length):
         with torch.no_grad():
-            _, n_action, _, n_recurrent_hidden_states = zip(
+            n_value, n_action, n_recurrent_hidden_states = zip(
                 *[
                     agent.model.act(
-                        n_obs[agent.agent_id], recurrent_hidden_states, masks
+                        n_obs[agent.agent_id], recurrent_hidden_states, masks, 0.0001
                     )
                     for agent, recurrent_hidden_states in zip(
                         agents, n_recurrent_hidden_states
@@ -176,9 +207,7 @@ def evaluate(agents):
                 ]
             )
 
-        # Obser reward and next obs
-        n_obs, _, done, infos = eval_envs.step(n_action)
-                # print(infos)
+        n_obs, rewards, done, infos = eval_envs.step(n_action)
 
     #TODO: Correctly evaluate vectorized envs...
     kpis = eval_envs.env_method("evaluate", baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV, indices=0)[0]
@@ -186,31 +215,55 @@ def evaluate(agents):
     kpis = kpis.dropna(how='all')
     print(kpis)
 
+    eval_envs.close()
+
+
 def main():
+
+    load_agent = False
+    agent_dir = "2023-10-24_18-03-57"
 
     # Make vectorized envs
     torch.set_num_threads(1)
-    envs = make_vec_envs(dataset_name, seed, num_procs, time_limit, wrappers, device, monitor_dir=None)
-    obs = envs.reset()
+    envs = make_vec_envs(env_name=dataset_name,
+                         seed=seed,
+                         parallel=num_procs,
+                         time_limit=None, # time_limit=time_limit,
+                         random_start_pos=False,
+                         min_episode_length=1000, # only used for random_start_pos
+                         wrappers=wrappers,
+                         device=device,
+                         monitor_dir=None
+                         )
+    
+    if not load_agent:
 
-    # Initialize agents
-    agents = init_agents(envs, obs)
+        obs = envs.reset()
 
-    # Train models
-    agents, policy_losses, value_losses = train(agents, envs)
+        # Initialize agents
+        agents = init_agents(envs, obs)
 
-    # Save trained models
-    save_agents(agents)
+        # Train models
+        agents, policy_losses, value_losses, rewards = train(agents, envs)
 
-    envs.close()
+        # Save trained models
+        save_agents(agents)
 
-    # # Evaluate agents
-    # agent_dir = "2023-10-18_18-26-34"
-    # agents = load_agents(envs, agent_dir)
-    # evaluate(agents)
-   
-    value_losses = np.array(value_losses)
-    np.save('valueloss_testrun.npy', value_losses)
+        envs.close()
+
+        # Save results
+        value_losses = np.array(value_losses)
+        rewards = np.array(rewards)
+        np.save('valueloss_experiment_100000000.npy', value_losses)
+        np.save('rewards_experiment_100000000.npy', rewards)
+
+    else:
+        # Load agents
+        agents = load_agents(envs, agent_dir)
+    
+    # Evaluate agents
+    evaluate(agents)
+
 
 if __name__ == '__main__':
     main()

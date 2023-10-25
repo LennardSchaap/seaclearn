@@ -87,7 +87,6 @@ class A2C:
         self,
         storages,
         value_loss_coef,
-        entropy_coef,
         seac_coef,
         max_grad_norm,
         device,
