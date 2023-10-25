@@ -163,21 +163,22 @@ def evaluate(agents):
         int(num_env_steps) // num_steps // num_procs
     )
 
-    for j in range(1, num_updates + 1):
-        for step in range(num_steps):
-            with torch.no_grad():
-                n_value, n_action, n_recurrent_hidden_states = zip(
-                    *[
-                        agent.model.act(
-                            agent.storage.obs[step],
-                            agent.storage.recurrent_hidden_states[step],
-                            agent.storage.masks[step],
-                        )
-                        for agent in agents
-                    ]
-                )
+    while len(all_infos) < episodes_per_eval:
+        with torch.no_grad():
+            _, n_action, _, n_recurrent_hidden_states = zip(
+                *[
+                    agent.model.act(
+                        n_obs[agent.agent_id], recurrent_hidden_states, masks
+                    )
+                    for agent, recurrent_hidden_states in zip(
+                        agents, n_recurrent_hidden_states
+                    )
+                ]
+            )
 
-                n_obs, _, done, infos = eval_envs.step(n_action)
+        # Obser reward and next obs
+        n_obs, _, done, infos = eval_envs.step(n_action)
+                # print(infos)
 
     #TODO: Correctly evaluate vectorized envs...
     kpis = eval_envs.env_method("evaluate", baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV, indices=0)[0]
