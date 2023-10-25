@@ -1,4 +1,5 @@
 from wrappers import RecordEpisodeStatistics, SquashDones, FlattenObservation, FlattenAction
+from citylearn.wrappers import NormalizedSpaceWrapper
 import torch
 import os
 import datetime
@@ -34,10 +35,11 @@ variance = 0.5
 
 # Environment settings
 num_steps = 5
-num_env_steps = 1000000
+num_env_steps = 10000000
 
 # Environment wrappers
 wrappers = (
+    # NormalizedSpaceWrapper, # TODO: Do this on the data itself
     FlattenObservation,
     FlattenAction,
 )
@@ -69,6 +71,7 @@ def train(agents, envs):
     num_updates = (
         int(num_env_steps) // num_steps // num_procs
     )
+    print(num_updates)
 
     for j in range(1, num_updates + 1):
 
@@ -112,7 +115,6 @@ def train(agents, envs):
                     # bad_masks,
                 )
 
-        # value_loss, action_loss, dist_entropy = agent.update(rollouts)
         for agent in agents:
             agent.compute_returns(use_gae, gamma, gae_lambda, use_proper_time_limits)
 
@@ -170,25 +172,34 @@ def load_agents(envs, agent_dir):
 # Evaluate agents
 def evaluate(agents):
 
-    eval_envs = make_vec_envs(dataset_name, seed, num_procs, time_limit, wrappers, device, monitor_dir=None)
+    eval_envs = make_vec_envs(env_name=dataset_name,
+                              seed=seed,
+                              parallel=num_procs,
+                              time_limit=None, # time_limit=time_limit,
+                              random_start_pos=False,
+                              min_episode_length=1000, # only when using random_start_pos
+                              wrappers=wrappers,
+                              device=device,
+                              monitor_dir=None
+                              )
     n_obs = eval_envs.reset()
 
-    evaluation_eps = 1000
-
+    ep_length = 1000
     n_recurrent_hidden_states = [
         torch.zeros(
-            evaluation_eps, agent.model.recurrent_hidden_state_size, device=device
+            ep_length, agent.model.recurrent_hidden_state_size, device=device
         )
         for agent in agents
     ]
-    masks = torch.zeros(evaluation_eps, 1, device=device)
+    masks = torch.zeros(ep_length, 1, device=device)
 
-    for _ in range(evaluation_eps):
+    done = np.array([False for _ in range(num_procs)])
+    for _ in range(ep_length):
         with torch.no_grad():
-            _, n_action, n_recurrent_hidden_states = zip(
+            n_value, n_action, n_recurrent_hidden_states = zip(
                 *[
                     agent.model.act(
-                        n_obs[agent.agent_id], recurrent_hidden_states, masks
+                        n_obs[agent.agent_id], recurrent_hidden_states, masks, 0.0001
                     )
                     for agent, recurrent_hidden_states in zip(
                         agents, n_recurrent_hidden_states
@@ -209,32 +220,50 @@ def evaluate(agents):
 
 def main():
 
+    load_agent = False
+    agent_dir = "2023-10-24_18-03-57"
+
     # Make vectorized envs
     torch.set_num_threads(1)
-    envs = make_vec_envs(dataset_name, seed, num_procs, time_limit, wrappers, device, monitor_dir=None)
-    obs = envs.reset()
+    envs = make_vec_envs(env_name=dataset_name,
+                         seed=seed,
+                         parallel=num_procs,
+                         time_limit=None, # time_limit=time_limit,
+                         random_start_pos=False,
+                         min_episode_length=1000, # only used for random_start_pos
+                         wrappers=wrappers,
+                         device=device,
+                         monitor_dir=None
+                         )
+    
+    if not load_agent:
 
-    # Initialize agents
-    agents = init_agents(envs, obs)
+        obs = envs.reset()
 
-    # Train models
-    agents, policy_losses, value_losses, rewards = train(agents, envs)
+        # Initialize agents
+        agents = init_agents(envs, obs)
 
-    # Save trained models
-    save_agents(agents)
+        # Train models
+        agents, policy_losses, value_losses, rewards = train(agents, envs)
 
-    envs.close()
+        # Save trained models
+        save_agents(agents)
 
+        envs.close()
+
+        # Save results
+        value_losses = np.array(value_losses)
+        rewards = np.array(rewards)
+        np.save('valueloss_experiment_100000000.npy', value_losses)
+        np.save('rewards_experiment_100000000.npy', rewards)
+
+    else:
+        # Load agents
+        agents = load_agents(envs, agent_dir)
+    
     # Evaluate agents
-    # agent_dir = "2023-10-20_14-21-24"
-    # agents = load_agents(envs, agent_dir)
-    # evaluate(agents)
-   
+    evaluate(agents)
 
-    value_losses = np.array(value_losses)
-    rewards = np.array(rewards)
-    np.save('valueloss_test_experiment.npy', value_losses)
-    np.save('rewards_test_experiment.npy', rewards)
 
 if __name__ == '__main__':
     main()
