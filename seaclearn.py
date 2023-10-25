@@ -15,7 +15,7 @@ from os import path
 from citylearn.citylearn import CityLearnEnv, EvaluationCondition
 
 # Dataset information
-dataset_name = 'citylearn_challenge_2022_phase_1'
+dataset_name = 'data/citylearn_challenge_2022_phase_1/schema.json'
 num_procs = 4
 time_limit = 1000
 seed = 42
@@ -155,28 +155,32 @@ def save_agents(agents):
 
 
 # Load agent models
-def load_agents(envs, agent_dir):
+def load_agents(envs, agent_dir, evaluation = False):
     agents = []
-
+    procs = 1
     save_dir = "./results/trained_models/"
-    # TODO: Get num agents
+
+    if not evaluation:
+        n = num_procs
+
     for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space)):
-        agent = A2C(i, osp, asp, num_processes=num_procs)
+        agent = A2C(i, osp, asp, num_processes = n)
         model_path = f"{save_dir}{agent_dir}/agent{i}"  # Update with the actual path
         agent.restore(model_path)
         agents.append(agent)
 
     return agents
 
+def evaluate_single_env(agents):
+
+    env = CityLearnEnv(env_id, central_agent=False, simulation_start_time_step=start_pos, random_seed=seed+rank)
 
 # Evaluate agents
 def evaluate(agents):
 
     eval_envs = make_vec_envs(env_name=dataset_name,
-                              seed=seed,
                               parallel=num_procs,
                               time_limit=None, # time_limit=time_limit,
-                              random_start_pos=False,
                               min_episode_length=1000, # only when using random_start_pos
                               wrappers=wrappers,
                               device=device,
@@ -226,10 +230,8 @@ def main():
     # Make vectorized envs
     torch.set_num_threads(1)
     envs = make_vec_envs(env_name=dataset_name,
-                         seed=seed,
                          parallel=num_procs,
                          time_limit=None, # time_limit=time_limit,
-                         random_start_pos=False,
                          min_episode_length=1000, # only used for random_start_pos
                          wrappers=wrappers,
                          device=device,

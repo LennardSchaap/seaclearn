@@ -13,7 +13,6 @@ from stable_baselines3.common.vec_env.vec_normalize import VecNormalize as VecNo
 from citylearn.citylearn import CityLearnEnv
 from wrappers import TimeLimit, Monitor
 
-
 class MADummyVecEnv(DummyVecEnv):
     def __init__(self, env_fns):
         super().__init__(env_fns)
@@ -21,17 +20,25 @@ class MADummyVecEnv(DummyVecEnv):
         # change this because we want >1 reward
         self.buf_rews = np.zeros((self.num_envs, agents), dtype=np.float32)
 
-def make_env(env_id, seed, rank, time_limit, random_start_pos, min_episode_length, wrappers, monitor_dir):
+def make_env(env_name, rank, time_limit, min_episode_length, wrappers, monitor_dir, random_start = False, evaluate = False):
 
     def _thunk():
 
-        if random_start_pos:
+        seed = 777
+        
+        #TODO: Mooier maken
+        if evaluate:
+            start_pos = 7759
+            end_pos = 8759
+        elif random_start:
             np.random.seed(seed + rank)
             start_pos = np.random.randint(0, 8759-min_episode_length) # citylearn challenge data length is 8759, baeda_3dem is shorter (~2000)
         else:
             start_pos = 0
-        env = CityLearnEnv(env_id, central_agent=False, simulation_start_time_step=start_pos, random_seed=seed+rank)
-        env.seed(seed + rank)
+            end_pos = 7759
+        ######
+
+        env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
 
         if time_limit:
             env = TimeLimit(env, time_limit)
@@ -47,16 +54,16 @@ def make_env(env_id, seed, rank, time_limit, random_start_pos, min_episode_lengt
 
 
 def make_vec_envs(
-    env_name, seed, parallel, time_limit, random_start_pos, min_episode_length, wrappers, device, monitor_dir=None
+    env_name, parallel, time_limit, min_episode_length, wrappers, device, monitor_dir=None
 ):
     envs = [
-        make_env(env_name, seed, i, time_limit, random_start_pos, min_episode_length, wrappers, monitor_dir) for i in range(parallel)
+        make_env(env_name, i, time_limit, min_episode_length, wrappers, monitor_dir) for i in range(parallel)
     ]
 
     if len(envs) == 1 or monitor_dir:
         envs = MADummyVecEnv(envs)
     else:
-        envs = SubprocVecEnv(envs, start_method="spawn")
+        envs = SubprocVecEnv(envs, start_method="fork")
 
     envs = VecPyTorch(envs, device)
     return envs
