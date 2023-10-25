@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+import shutil
 
 # save all dataframes as csv files in a new folder called citylearn_challenge_2022_phase_1_normalized
 
@@ -44,3 +45,6 @@ pricing.to_csv('data/citylearn_challenge_2022_phase_1_normalized/pricing.csv', i
 carbon_intensity = pd.read_csv('data/citylearn_challenge_2022_phase_1/carbon_intensity.csv')
 carbon_intensity = (carbon_intensity - carbon_intensity.min()) / (carbon_intensity.max() - carbon_intensity.min())
 carbon_intensity.to_csv('data/citylearn_challenge_2022_phase_1_normalized/carbon_intensity.csv', index=False)
+
+# copy schema.json file to new folder
+shutil.copy('data/citylearn_challenge_2022_phase_1/schema.json', 'data/citylearn_challenge_2022_phase_1_normalized/schema.json')
