@@ -1,5 +1,5 @@
 from wrappers import RecordEpisodeStatistics, SquashDones, FlattenObservation, FlattenAction
-from citylearn.wrappers import NormalizedSpaceWrapper
+from citylearn.wrappers import NormalizedObservationWrapper
 import torch
 import os
 import datetime
@@ -15,7 +15,7 @@ from os import path
 from citylearn.citylearn import CityLearnEnv, EvaluationCondition
 
 # Dataset information
-dataset_name = 'data/citylearn_challenge_2022_phase_1/schema.json'
+dataset_name = 'data/citylearn_challenge_2022_phase_1_normalized_period/schema.json'
 num_procs = 4
 time_limit = 1000
 seed = 42
@@ -35,11 +35,11 @@ variance = 0.5
 
 # Environment settings
 num_steps = 5
-num_env_steps = 10000000
+num_env_steps = 10000000 # 17554125 for roughly 10 hours
 
 # Environment wrappers
 wrappers = (
-    # NormalizedSpaceWrapper, # TODO: Do this on the data itself
+    # NormalizedObservationWrapper, # TODO: Check if done correctly
     FlattenObservation,
     FlattenAction,
 )
@@ -71,8 +71,8 @@ def train(agents, envs):
     num_updates = (
         int(num_env_steps) // num_steps // num_procs
     )
-    print(num_updates)
-
+    # print current time
+    print('Started at:', datetime.datetime.now())
     for j in range(1, num_updates + 1):
 
         for step in range(num_steps):
@@ -130,13 +130,14 @@ def train(agents, envs):
         for agent in agents:
             agent.storage.after_update()
 
-        if j % 10 == 0:
+        if j % 1000 == 0:
             print(f'update {j}')
             print('variance', variance)
 
-        variance *= 0.99999
+        variance *= 0.999999
         variance = max(0.01, variance)
 
+    print('Finished at:', datetime.datetime.now())
     return agents, policy_losses, value_losses, rewards
 
 
@@ -171,9 +172,9 @@ def load_agents(envs, agent_dir, evaluation = False):
 
     return agents
 
-def evaluate_single_env(agents):
+# def evaluate_single_env(agents):
 
-    env = CityLearnEnv(env_id, central_agent=False, simulation_start_time_step=start_pos, random_seed=seed+rank)
+#     env = CityLearnEnv(env_id, central_agent=False, simulation_start_time_step=start_pos, random_seed=seed+rank)
 
 # Evaluate agents
 def evaluate(agents):
@@ -188,7 +189,7 @@ def evaluate(agents):
                               )
     n_obs = eval_envs.reset()
 
-    ep_length = 1000
+    ep_length = 7000
     n_recurrent_hidden_states = [
         torch.zeros(
             ep_length, agent.model.recurrent_hidden_state_size, device=device
@@ -197,21 +198,28 @@ def evaluate(agents):
     ]
     masks = torch.zeros(ep_length, 1, device=device)
 
+    performed_actions = []
+
     done = np.array([False for _ in range(num_procs)])
     for _ in range(ep_length):
         with torch.no_grad():
             n_value, n_action, n_recurrent_hidden_states = zip(
                 *[
                     agent.model.act(
-                        n_obs[agent.agent_id], recurrent_hidden_states, masks, 0.0001
+                        n_obs[agent.agent_id], recurrent_hidden_states, masks, 0.000001
                     )
                     for agent, recurrent_hidden_states in zip(
                         agents, n_recurrent_hidden_states
                     )
                 ]
             )
-
         n_obs, rewards, done, infos = eval_envs.step(n_action)
+
+        actions = []
+        for tensor in n_action:
+            action = tensor.detach().cpu().numpy()[0]
+            actions.append(action)
+        performed_actions.append(actions)
 
     #TODO: Correctly evaluate vectorized envs...
     kpis = eval_envs.env_method("evaluate", baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV, indices=0)[0]
@@ -221,11 +229,13 @@ def evaluate(agents):
 
     eval_envs.close()
 
+    return performed_actions
+
 
 def main():
 
-    load_agent = False
-    agent_dir = "2023-10-24_18-03-57"
+    load_agent = True
+    agent_dir = "2023-10-27_07-27-27"
 
     # Make vectorized envs
     torch.set_num_threads(1)
@@ -256,15 +266,32 @@ def main():
         # Save results
         value_losses = np.array(value_losses)
         rewards = np.array(rewards)
-        np.save('valueloss_experiment_100000000.npy', value_losses)
-        np.save('rewards_experiment_100000000.npy', rewards)
+        exp_name = 'experiment_var05_10mil_0999999'
+        np.save(f'valueloss_{exp_name}.npy', value_losses)
+        np.save(f'rewards_{exp_name}.npy', rewards)
 
     else:
         # Load agents
         agents = load_agents(envs, agent_dir)
-    
+
     # Evaluate agents
-    evaluate(agents)
+    performed_actions = evaluate(agents)
+
+
+    # Render actions
+    env = CityLearnEnv(dataset_name, central_agent=False, random_seed=seed)
+    env.reset()
+
+    for action in performed_actions:
+        env.step(action)
+    
+    rendered_env = env.render() # returns  np.concatenate([graphic_image, plot_image], axis=1)
+
+    import matplotlib
+    matplotlib.use('TkAgg')
+    import matplotlib.pyplot as plt
+    plt.imshow(rendered_env)
+    plt.show()
 
 
 if __name__ == '__main__':
