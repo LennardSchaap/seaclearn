@@ -49,7 +49,7 @@ class Policy(nn.Module):
         dist = D.Beta(alpha, beta) 
 
         # Use rsample to obtain samples with reparameterization for gradient flow
-        action = dist.rsample() # Action is now a value between 0 and 1
+        action = dist.rsample() # Action is now a value between [0, 1]
 
         # Calculate log probabilities
         action_log_probs = dist.log_prob(action)
@@ -75,8 +75,8 @@ class Policy(nn.Module):
         # Create beta distribution
         beta_dist = D.Beta(alpha, beta)
 
-        # Calculate log probabilities
-        action_log_probs = beta_dist.log_prob(action)
+        # Calculate log probabilities for the original action by correcting
+        action_log_probs = beta_dist.log_prob(action) - torch.log(torch.tensor(2.0))
 
         # Calculate the distribution entropy for the beta distribution
         dist_entropy = beta_dist.entropy().mean()

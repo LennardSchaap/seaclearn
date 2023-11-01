@@ -20,8 +20,8 @@ from citylearn.citylearn import CityLearnEnv, EvaluationCondition
 
 # Dataset information
 
-# dataset_name = 'data/citylearn_challenge_2022_phase_1_normalized_period/schema.json'
-dataset_name = 'citylearn_challenge_2022_phase_1'
+dataset_name = './data/citylearn_challenge_2022_phase_1/schema.json'
+# dataset_name = 'citylearn_challenge_2022_phase_1'
 num_procs = 4
 time_limit = 1000
 seed = 42
@@ -38,11 +38,11 @@ value_loss_coef = 0.5
 seac_coef = 1.0
 max_grad_norm = 0.5
 device = "cpu"
-variance = 0.5
+# variance = 0.5
 
 # Environment settings
 num_steps = 5
-num_env_steps = 20000
+num_env_steps = 50000
 
 # Environment wrappers
 wrappers = (
@@ -67,8 +67,8 @@ def init_agents(envs, obs):
 # Train agents
 def train(agents, envs):
 
-    # use global variance
-    global variance
+    # # use global variance
+    # global variance
 
     policy_losses, value_losses, rewards = [], [], []
 
@@ -116,6 +116,7 @@ def train(agents, envs):
                     bad_masks,
                 )
 
+
         for agent in agents:
             agent.compute_returns(use_gae, gamma, gae_lambda, use_proper_time_limits)
 
@@ -133,10 +134,10 @@ def train(agents, envs):
 
         if j % 1000 == 0:
             print(f'update {j}')
-            print('variance', variance)
+        #     print('variance', variance)
 
-        variance *= 0.999999
-        variance = max(0.01, variance)
+        # variance *= 0.999999
+        # variance = max(0.01, variance)
 
     print('Finished at:', datetime.datetime.now())
     return agents, policy_losses, value_losses, rewards
