@@ -2,17 +2,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-def load(filename):
-    return np.load(filename)
 
 def plot(filenames, labels):
     fig, axs = plt.subplots(2, 1, figsize=(10, 6))
-    for i in range(len(filenames)):
-        data = load(filenames[i])
-        data = smooth(data, 10000)
-        axs[i].plot(data, label=labels[i], color='C'+str(i))
-        axs[i].set_xlabel('time step')
-        axs[i].legend()
+    for filename in filenames:
+        for i in range(len(labels)):
+            data = np.load(labels[i]+filename+'.npy')
+            data = smooth(data, 1000)
+            axs[i].plot(data, label=labels[i]+filename, lw=0.75)
+    axs[0].legend()
+    axs[1].legend()
+    axs[0].set_xlabel('time step')
+    axs[1].set_xlabel('time step')
+    axs[0].set_ylabel('reward')
+    axs[1].set_ylabel('value loss')
+    axs[1].set_ylim(0, 1000)
 
     if not os.path.exists('results/plots'):
         os.makedirs('results/plots')
@@ -29,9 +33,10 @@ def smooth(data, window_size):
     return np.convolve(data, np.ones(window_size), 'valid') / window_size
 
 def main():
-    filenames = ['rewards_experiment_10000000.npy', 'valueloss_experiment_10000000.npy']
-    labels = ['rewards', 'value loss']
-    plot(filenames, labels)
+    filenames = os.listdir()
+    filenames = [filename[7:-4] for filename in filenames if filename[-4:] == '.npy' and filename[:7] == 'rewards']
+    types = ['rewards', 'valueloss']
+    plot(filenames, types)
 
 if __name__ == "__main__":
     main()

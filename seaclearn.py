@@ -1,5 +1,5 @@
 from wrappers import RecordEpisodeStatistics, SquashDones, FlattenObservation, FlattenAction
-from citylearn.wrappers import NormalizedSpaceWrapper
+from citylearn.wrappers import NormalizedObservationWrapper
 import torch
 import os
 import datetime
@@ -8,7 +8,10 @@ import sys
 from envs import make_env, make_vec_envs
 from a2c import A2C
 
+import matplotlib
 import matplotlib.pyplot as plt
+matplotlib.use('TkAgg')
+from matplotlib.animation import FuncAnimation
 import numpy as np
 import uuid
 from os import path
@@ -16,8 +19,10 @@ from os import path
 from citylearn.citylearn import CityLearnEnv, EvaluationCondition
 
 # Dataset information
+
+# dataset_name = 'data/citylearn_challenge_2022_phase_1_normalized_period/schema.json'
 dataset_name = 'citylearn_challenge_2022_phase_1'
-num_procs = 2
+num_procs = 4
 time_limit = 1000
 seed = 42
 
@@ -36,15 +41,13 @@ variance = 0.5
 
 # Environment settings
 num_steps = 5
-num_env_steps = 200
+num_env_steps = 20000
 
 # Environment wrappers
 wrappers = (
-    # NormalizedSpaceWrapper, # TODO: Do this on the data itself
     FlattenObservation,
     FlattenAction,
 )
-
 
 # Initialize agents
 def init_agents(envs, obs):
@@ -60,7 +63,6 @@ def init_agents(envs, obs):
 
     return agents
 
-
 # Train agents
 def train(agents, envs):
 
@@ -72,8 +74,8 @@ def train(agents, envs):
     num_updates = (
         int(num_env_steps) // num_steps // num_procs
     )
-    print(num_updates)
-
+    # print current time
+    print('Started at:', datetime.datetime.now())
     for j in range(1, num_updates + 1):
 
         for step in range(num_steps):
@@ -130,13 +132,14 @@ def train(agents, envs):
         for agent in agents:
             agent.storage.after_update()
 
-        if j % 10 == 0:
+        if j % 1000 == 0:
             print(f'update {j}')
             print('variance', variance)
 
-        variance *= 0.99999
+        variance *= 0.999999
         variance = max(0.01, variance)
 
+    print('Finished at:', datetime.datetime.now())
     return agents, policy_losses, value_losses, rewards
 
 
@@ -153,7 +156,6 @@ def save_agents(agents):
         os.makedirs(save_at, exist_ok=True)
         agent.save(save_at)
 
-
 # Load agent models
 def load_agents(envs, agent_dir, evaluation = False):
     agents = []
@@ -165,17 +167,18 @@ def load_agents(envs, agent_dir, evaluation = False):
 
     for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space)):
         agent = A2C(i, osp, asp, num_processes = n)
-        model_path = f"{save_dir}{agent_dir}/agent{i}"  # Update with the actual path
+        model_path = f"{save_dir}{agent_dir}/agent{i}"
         agent.restore(model_path)
         agents.append(agent)
 
     return agents
 
-def evaluate_single_env(env, agents):
+def evaluate_single_env(env, agents, render=True, animation=False):
 
     obs = env.reset()
     obs = torch.tensor(obs, dtype=torch.float32)
     evaluation_steps = 1000
+    render_freq = 10
 
     n_recurrent_hidden_states = [
         torch.zeros(
@@ -184,16 +187,45 @@ def evaluate_single_env(env, agents):
         for agent in agents
     ]
     masks = torch.zeros(evaluation_steps, 1, device=device)
+    frames = []
 
-    n_actions = []
     for j in range(evaluation_steps):
+        n_actions = []  
         for i, agent in enumerate(agents):
             with torch.no_grad():
                 n_value, n_action, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks, 0.0001)
                 n_actions.append(n_action)
-
+        n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
         obs, rewards, done, info = env.step(n_actions)
         obs = torch.tensor(obs, dtype=torch.float32)
+
+        if render and not j % render_freq:
+            frame_data = env.render()
+            frames.append(frame_data)
+
+    print("Done evaluating.")
+
+    if render:
+        for frame_data in frames:
+            plt.imshow(frame_data)
+            plt.pause(0.01)
+            plt.draw()
+
+        plt.show()
+
+    if animation:
+        print("Creating animation...")
+        fig, ax = plt.subplots()
+        ax.axis('off')
+        anim = FuncAnimation(fig, lambda x: plt.imshow(frames[x], animated=True), frames=len(frames), blit=False)
+        anim.save("evaluation.mp4", writer="ffmpeg")
+        plt.show()
+        print("Animation created.")
+
+    kpis = env.evaluate(baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV)
+    kpis = kpis.pivot(index='cost_function', columns='name', values='value')
+    kpis = kpis.dropna(how='all')
+    print(kpis)
 
 # Evaluate agents
 def evaluate(agents):
@@ -207,7 +239,7 @@ def evaluate(agents):
                               )
     n_obs = eval_envs.reset()
 
-    ep_length = 1000
+    ep_length = 7000
     n_recurrent_hidden_states = [
         torch.zeros(
             ep_length, agent.model.recurrent_hidden_state_size, device=device
@@ -217,21 +249,28 @@ def evaluate(agents):
 
     masks = torch.zeros(ep_length, 1, device=device)
 
+    performed_actions = []
+
     done = np.array([False for _ in range(num_procs)])
     for _ in range(ep_length):
         with torch.no_grad():
             n_value, n_action, n_recurrent_hidden_states = zip(
                 *[
                     agent.model.act(
-                        n_obs[agent.agent_id], recurrent_hidden_states, masks, 0.0001
+                        n_obs[agent.agent_id], recurrent_hidden_states, masks, 0.000001
                     )
                     for agent, recurrent_hidden_states in zip(
                         agents, n_recurrent_hidden_states
                     )
                 ]
             )
-
         n_obs, rewards, done, infos = eval_envs.step(n_action)
+
+        actions = []
+        for tensor in n_action:
+            action = tensor.detach().cpu().numpy()[0]
+            actions.append(action)
+        performed_actions.append(actions)
 
     #TODO: Correctly evaluate vectorized envs...
     kpis = eval_envs.env_method("evaluate", baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV, indices=0)[0]
@@ -243,10 +282,12 @@ def evaluate(agents):
 
 def main():
 
-    load_agent = True
-    agent_dir = "2023-10-18_18-48-00"
-    
-    if not load_agent:
+    agent_dir = "2023-11-01_13-45-01"
+
+    train_new_agent = False
+    evaluate = True
+
+    if train_new_agent:
 
         # Make vectorized envs
         torch.set_num_threads(1)
@@ -268,29 +309,31 @@ def main():
 
         # Save trained models
         save_agents(agents)
+        print("Saved agent.")
 
         envs.close()
 
         # Save results
         value_losses = np.array(value_losses)
         rewards = np.array(rewards)
-        np.save('valueloss_experiment_100000000.npy', value_losses)
-        np.save('rewards_experiment_100000000.npy', rewards)
+        exp_name = 'experiment_var05_10mil_0999999'
+        np.save(f'valueloss_{exp_name}.npy', value_losses)
+        np.save(f'rewards_{exp_name}.npy', rewards)
 
     else:
-        # Load agents
         env = make_env(env_name = dataset_name,
                rank = 1,
                time_limit=None,
                wrappers = [],
                monitor_dir = None)
 
+        print("Loading agents...")
         agents = load_agents(env, agent_dir, evaluation = True)
-        evaluate_single_env(env, agents)
-    
-    # Evaluate agents
-    evaluate(agents)
+        print("Agents loaded!")
 
+    if evaluate:
+        print("Evaluating...")
+        evaluate_single_env(env, agents)
 
 if __name__ == '__main__':
     main()

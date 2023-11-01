@@ -49,7 +49,6 @@ def _make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = 
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
 
-        print(env)
         if time_limit:
             env = TimeLimit(env, time_limit)
         for wrapper in wrappers:
@@ -61,7 +60,6 @@ def _make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = 
         return env
 
     return _thunk
-
 
 def make_vec_envs(
     env_name, parallel, time_limit, wrappers, device, monitor_dir=None
@@ -77,24 +75,6 @@ def make_vec_envs(
 
     envs = VecPyTorch(envs, device)
     return envs
-
-class PyTorchEnv(CityLearnEnv):
-    def __init__(self, venv, device):
-        super(PyTorchEnv, self).__init__(venv)
-        self.device = device
-
-    # def reset(self):
-    #     obs = self.env.reset()
-    #     return torch.from_numpy(obs).to(self.device)
-
-    # def step(self, action):
-    #     obs, rew, done, info = self.env.step(action)
-    #     return (
-    #         torch.from_numpy(obs).float().to(self.device),
-    #         torch.tensor(rew).float().to(self.device),
-    #         torch.tensor(done).to(self.device),
-    #         info,
-    #     )
 
 class VecPyTorch(VecEnvWrapper):
     def __init__(self, venv, device):

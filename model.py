@@ -30,9 +30,10 @@ class Policy(nn.Module):
     def forward(self, inputs, rnn_hxs, masks):
         raise NotImplementedError
 
-    def add_noise(self, action, variance):
+    def add_noise(self, action, variance, noise_clip=2.0):
 
         noise = (variance**0.5)*torch.randn_like(action)
+        noise = torch.clamp(noise, -noise_clip, noise_clip)
         action += noise
         action = torch.clamp(action, -1, 1)
 
