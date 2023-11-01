@@ -49,10 +49,16 @@ class Policy(nn.Module):
         dist = D.Beta(alpha, beta) 
 
         # Use rsample to obtain samples with reparameterization for gradient flow
-        action = dist.rsample()
+        action = dist.rsample() # Action is now a value between 0 and 1
+
+        # Calculate log probabilities
         action_log_probs = dist.log_prob(action)
+
+        # Map action to a range between [-1, 1]
         action = action * 2 - 1
-        action_log_probs = action_log_probs * torch.log(torch.tensor(2.0))
+
+        # Correct the action log probs for this new range
+        action_log_probs = action_log_probs - torch.log(torch.tensor(2.0))
 
         return value, action, action_log_probs, rnn_hxs
 
@@ -63,13 +69,16 @@ class Policy(nn.Module):
     def evaluate_actions(self, inputs, rnn_hxs, masks, action): 
         value, (alpha, beta), rnn_hxs = self.model(inputs, rnn_hxs, masks)
 
+        # Map action to a range between [0, 1]
         action = (action + 1) / 2
+
         # Create beta distribution
         beta_dist = D.Beta(alpha, beta)
 
+        # Calculate log probabilities
         action_log_probs = beta_dist.log_prob(action)
-        action_log_probs = action_log_probs * torch.log(torch.tensor(2.0))
 
+        # Calculate the distribution entropy for the beta distribution
         dist_entropy = beta_dist.entropy().mean()
 
         return value, action_log_probs, dist_entropy, rnn_hxs
