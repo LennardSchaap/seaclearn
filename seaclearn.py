@@ -3,8 +3,9 @@ from citylearn.wrappers import NormalizedSpaceWrapper
 import torch
 import os
 import datetime
+import sys
 
-from envs import make_vec_envs
+from envs import make_env, make_vec_envs
 from a2c import A2C
 
 import matplotlib.pyplot as plt
@@ -15,8 +16,8 @@ from os import path
 from citylearn.citylearn import CityLearnEnv, EvaluationCondition
 
 # Dataset information
-dataset_name = 'data/citylearn_challenge_2022_phase_1/schema.json'
-num_procs = 4
+dataset_name = 'citylearn_challenge_2022_phase_1'
+num_procs = 2
 time_limit = 1000
 seed = 42
 
@@ -35,7 +36,7 @@ variance = 0.5
 
 # Environment settings
 num_steps = 5
-num_env_steps = 10000000
+num_env_steps = 200
 
 # Environment wrappers
 wrappers = (
@@ -89,7 +90,6 @@ def train(agents, envs):
                         for agent in agents
                     ]
                 )
-
             obs, reward, done, infos = envs.step(n_action)
             
             # envs.envs[0].render()
@@ -157,7 +157,7 @@ def save_agents(agents):
 # Load agent models
 def load_agents(envs, agent_dir, evaluation = False):
     agents = []
-    procs = 1
+    n = 1
     save_dir = "./results/trained_models/"
 
     if not evaluation:
@@ -171,9 +171,29 @@ def load_agents(envs, agent_dir, evaluation = False):
 
     return agents
 
-def evaluate_single_env(agents):
+def evaluate_single_env(env, agents):
 
-    env = CityLearnEnv(env_id, central_agent=False, simulation_start_time_step=start_pos, random_seed=seed+rank)
+    obs = env.reset()
+    obs = torch.tensor(obs, dtype=torch.float32)
+    evaluation_steps = 1000
+
+    n_recurrent_hidden_states = [
+        torch.zeros(
+            evaluation_steps, agent.model.recurrent_hidden_state_size, device=device
+        )
+        for agent in agents
+    ]
+    masks = torch.zeros(evaluation_steps, 1, device=device)
+
+    n_actions = []
+    for j in range(evaluation_steps):
+        for i, agent in enumerate(agents):
+            with torch.no_grad():
+                n_value, n_action, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks, 0.0001)
+                n_actions.append(n_action)
+
+        obs, rewards, done, info = env.step(n_actions)
+        obs = torch.tensor(obs, dtype=torch.float32)
 
 # Evaluate agents
 def evaluate(agents):
@@ -181,7 +201,6 @@ def evaluate(agents):
     eval_envs = make_vec_envs(env_name=dataset_name,
                               parallel=num_procs,
                               time_limit=None, # time_limit=time_limit,
-                              min_episode_length=1000, # only when using random_start_pos
                               wrappers=wrappers,
                               device=device,
                               monitor_dir=None
@@ -195,6 +214,7 @@ def evaluate(agents):
         )
         for agent in agents
     ]
+
     masks = torch.zeros(ep_length, 1, device=device)
 
     done = np.array([False for _ in range(num_procs)])
@@ -221,24 +241,22 @@ def evaluate(agents):
 
     eval_envs.close()
 
-
 def main():
 
-    load_agent = False
-    agent_dir = "2023-10-24_18-03-57"
-
-    # Make vectorized envs
-    torch.set_num_threads(1)
-    envs = make_vec_envs(env_name=dataset_name,
-                         parallel=num_procs,
-                         time_limit=None, # time_limit=time_limit,
-                         min_episode_length=1000, # only used for random_start_pos
-                         wrappers=wrappers,
-                         device=device,
-                         monitor_dir=None
-                         )
+    load_agent = True
+    agent_dir = "2023-10-18_18-48-00"
     
     if not load_agent:
+
+        # Make vectorized envs
+        torch.set_num_threads(1)
+        envs = make_vec_envs(env_name=dataset_name,
+                             parallel=num_procs,
+                             time_limit=None, # time_limit=time_limit,
+                             wrappers=wrappers,
+                             device=device,
+                             monitor_dir=None
+                             )
 
         obs = envs.reset()
 
@@ -261,7 +279,14 @@ def main():
 
     else:
         # Load agents
-        agents = load_agents(envs, agent_dir)
+        env = make_env(env_name = dataset_name,
+               rank = 1,
+               time_limit=None,
+               wrappers = [],
+               monitor_dir = None)
+
+        agents = load_agents(env, agent_dir, evaluation = True)
+        evaluate_single_env(env, agents)
     
     # Evaluate agents
     evaluate(agents)

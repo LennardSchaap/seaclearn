@@ -10,6 +10,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnvW
 from stable_baselines3.common.vec_env.vec_video_recorder import VecVideoRecorder
 from stable_baselines3.common.vec_env.vec_normalize import VecNormalize as VecNormalize_
 
+from citylearn.wrappers import StableBaselines3Wrapper
 from citylearn.citylearn import CityLearnEnv
 from wrappers import TimeLimit, Monitor
 
@@ -20,19 +21,27 @@ class MADummyVecEnv(DummyVecEnv):
         # change this because we want >1 reward
         self.buf_rews = np.zeros((self.num_envs, agents), dtype=np.float32)
 
-def make_env(env_name, rank, time_limit, min_episode_length, wrappers, monitor_dir, random_start = False, evaluate = False):
+def make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = False, evaluate = False):
+
+    start_pos = 7759
+    end_pos = 8759
+
+    env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
+    return env
+
+def _make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = False, evaluate = False):
 
     def _thunk():
 
         seed = 777
-        
+
         #TODO: Mooier maken
         if evaluate:
             start_pos = 7759
             end_pos = 8759
         elif random_start:
             np.random.seed(seed + rank)
-            start_pos = np.random.randint(0, 8759-min_episode_length) # citylearn challenge data length is 8759, baeda_3dem is shorter (~2000)
+            start_pos = np.random.randint(0, 7759) # citylearn challenge data length is 8759, baeda_3dem is shorter (~2000)
         else:
             start_pos = 0
             end_pos = 7759
@@ -40,6 +49,7 @@ def make_env(env_name, rank, time_limit, min_episode_length, wrappers, monitor_d
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
 
+        print(env)
         if time_limit:
             env = TimeLimit(env, time_limit)
         for wrapper in wrappers:
@@ -54,10 +64,10 @@ def make_env(env_name, rank, time_limit, min_episode_length, wrappers, monitor_d
 
 
 def make_vec_envs(
-    env_name, parallel, time_limit, min_episode_length, wrappers, device, monitor_dir=None
+    env_name, parallel, time_limit, wrappers, device, monitor_dir=None
 ):
     envs = [
-        make_env(env_name, i, time_limit, min_episode_length, wrappers, monitor_dir) for i in range(parallel)
+        _make_env(env_name, i, time_limit, wrappers, monitor_dir) for i in range(parallel)
     ]
 
     if len(envs) == 1 or monitor_dir:
@@ -68,6 +78,23 @@ def make_vec_envs(
     envs = VecPyTorch(envs, device)
     return envs
 
+class PyTorchEnv(CityLearnEnv):
+    def __init__(self, venv, device):
+        super(PyTorchEnv, self).__init__(venv)
+        self.device = device
+
+    # def reset(self):
+    #     obs = self.env.reset()
+    #     return torch.from_numpy(obs).to(self.device)
+
+    # def step(self, action):
+    #     obs, rew, done, info = self.env.step(action)
+    #     return (
+    #         torch.from_numpy(obs).float().to(self.device),
+    #         torch.tensor(rew).float().to(self.device),
+    #         torch.tensor(done).to(self.device),
+    #         info,
+    #     )
 
 class VecPyTorch(VecEnvWrapper):
     def __init__(self, venv, device):
