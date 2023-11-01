@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.distributions as D
 from gym.spaces.utils import flatdim
 
 from utils import init
@@ -39,27 +40,40 @@ class Policy(nn.Module):
 
         return action
 
-    def act(self, inputs, rnn_hxs, masks, variance, deterministic=False):
-        value, action, rnn_hxs = self.model(inputs, rnn_hxs, masks)
+    def act(self, inputs, rnn_hxs, masks, deterministic=False):
+        value, (alpha, beta), rnn_hxs = self.model(inputs, rnn_hxs, masks)
 
-        action = self.add_noise(action, variance)
+        # action = self.add_noise(action, variance)
 
-        return value, action, rnn_hxs
+        # Create alpha beta distribution
+        dist = D.Beta(alpha, beta) 
+
+        # Use rsample to obtain samples with reparameterization for gradient flow
+        action = dist.rsample()
+        action_log_probs = dist.log_prob(action)
+        action = action * 2 - 1
+        action_log_probs = action_log_probs * torch.log(torch.tensor(2.0))
+
+        return value, action, action_log_probs, rnn_hxs
 
     def get_value(self, inputs, rnn_hxs, masks):
         value, _, _ = self.model(inputs, rnn_hxs, masks)
         return value
     
     def evaluate_actions(self, inputs, rnn_hxs, masks, action): 
-        value, actor_features, rnn_hxs = self.model(inputs, rnn_hxs, masks)
+        value, (alpha, beta), rnn_hxs = self.model(inputs, rnn_hxs, masks)
 
-        # dist = self.dist(actor_features)
+        action = (action + 1) / 2
+        # Create beta distribution
+        beta_dist = D.Beta(alpha, beta)
 
-        # action_log_probs = dist.log_probs(action)
-        # dist_entropy = dist.entropy().mean()
+        action_log_probs = beta_dist.log_prob(action)
+        action_log_probs = action_log_probs * torch.log(torch.tensor(2.0))
 
-        # return value, action_log_probs, dist_entropy, rnn_hxs
-        return value, None, None, rnn_hxs
+        dist_entropy = beta_dist.entropy().mean()
+
+        return value, action_log_probs, dist_entropy, rnn_hxs
+        # return value, None, None, rnn_hxs
 
 class NNBase(nn.Module):
     def __init__(self, recurrent, recurrent_input_size, hidden_size):
@@ -143,6 +157,10 @@ class NNBase(nn.Module):
 
         return x, hxs
 
+class SoftplusAddOne(nn.Module):
+    def forward(self, x):
+        return torch.nn.functional.softplus(x) + 1.0
+
 class MLPBase(NNBase):
     def __init__(self, num_inputs, num_outputs, recurrent=False, hidden_size=64):
         super(MLPBase, self).__init__(recurrent, num_inputs, hidden_size)
@@ -159,8 +177,11 @@ class MLPBase(NNBase):
             nn.ReLU(),
             init_(nn.Linear(hidden_size, hidden_size)),
             nn.ReLU(),
-            init_(nn.Linear(hidden_size, num_outputs)),
-            nn.Tanh()
+            nn.Sequential(
+                init_(nn.Linear(hidden_size, 2 * num_outputs)),  # Output alpha and beta values
+                SoftplusAddOne()# Add 1 so alpha and beta are > 1
+            ### http://proceedings.mlr.press/v70/chou17a/chou17a.pdf ###
+            )
         )
 
         self.critic = nn.Sequential(
@@ -182,5 +203,6 @@ class MLPBase(NNBase):
 
         hidden_critic = self.critic(x)
         hidden_actor = self.actor(x)
+        alpha, beta = hidden_actor.chunk(2, dim=-1)
 
-        return self.critic_linear(hidden_critic), hidden_actor, rnn_hxs
+        return self.critic_linear(hidden_critic), (alpha, beta), rnn_hxs

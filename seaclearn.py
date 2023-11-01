@@ -33,6 +33,7 @@ gae_lambda = 0.95
 use_proper_time_limits = True
 
 # Training params
+entropy_coef = 0.01
 value_loss_coef = 0.5
 seac_coef = 1.0
 max_grad_norm = 0.5
@@ -81,40 +82,38 @@ def train(agents, envs):
         for step in range(num_steps):
             # Sample actions
             with torch.no_grad():
-                n_value, n_action, n_recurrent_hidden_states = zip(
+                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
                     *[
                         agent.model.act(
                             agent.storage.obs[step],
                             agent.storage.recurrent_hidden_states[step],
                             agent.storage.masks[step],
-                            variance
                         )
                         for agent in agents
                     ]
                 )
-            obs, reward, done, infos = envs.step(n_action)
-            
+            obs, reward, done, infos = envs.step(n_action)            
             # envs.envs[0].render()
 
             # If done then clean the history of observations.
-            # masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
+            masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
 
-            # bad_masks = torch.FloatTensor(
-            #     [
-            #         [0.0] if info.get("TimeLimit.truncated", False) else [1.0]
-            #         for info in infos
-            #     ]
-            # )
+            bad_masks = torch.FloatTensor(
+                [
+                    [0.0] if info.get("TimeLimit.truncated", False) else [1.0]
+                    for info in infos
+                ]
+            )
             for i in range(len(agents)):
                 agents[i].storage.insert(
                     obs[i],
                     n_recurrent_hidden_states[i],
                     n_action[i],
-                    # None,
+                    n_action_log_prob[i],
                     n_value[i],
                     reward[:, i].unsqueeze(1),
-                    # masks,
-                    # bad_masks,
+                    masks,
+                    bad_masks,
                 )
 
         for agent in agents:
@@ -122,7 +121,7 @@ def train(agents, envs):
 
         total_policy_loss, total_value_loss = 0, 0
         for agent in agents:
-            loss = agent.update([a.storage for a in agents], value_loss_coef, seac_coef, max_grad_norm, device)
+            loss = agent.update([a.storage for a in agents], value_loss_coef, entropy_coef, seac_coef, max_grad_norm, device)
             total_policy_loss += loss['seac_policy_loss']
             total_value_loss += loss['seac_value_loss']
         policy_losses.append(total_policy_loss)
@@ -149,6 +148,8 @@ def save_agents(agents):
     now = datetime.datetime.now()
     name = now.strftime("%Y-%m-%d_%H-%M-%S")
 
+    print(f"Saved agents in {name}")
+
     save_dir = f"./results/trained_models/{name}"
 
     for agent in agents:
@@ -173,7 +174,7 @@ def load_agents(envs, agent_dir, evaluation = False):
 
     return agents
 
-def evaluate_single_env(env, agents, render=True, animation=False):
+def evaluate_single_env(env, agents, render=False, animation=False):
 
     obs = env.reset()
     obs = torch.tensor(obs, dtype=torch.float32)
@@ -193,7 +194,7 @@ def evaluate_single_env(env, agents, render=True, animation=False):
         n_actions = []  
         for i, agent in enumerate(agents):
             with torch.no_grad():
-                n_value, n_action, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks, 0.0001)
+                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks)
                 n_actions.append(n_action)
         n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
         obs, rewards, done, info = env.step(n_actions)
@@ -282,10 +283,9 @@ def evaluate(agents):
 
 def main():
 
-    agent_dir = "2023-11-01_13-45-01"
+    agent_dir = "2023-11-01_17-23-35"
 
-    train_new_agent = False
-    evaluate = True
+    train_new_agent = True
 
     if train_new_agent:
 
@@ -331,8 +331,8 @@ def main():
         agents = load_agents(env, agent_dir, evaluation = True)
         print("Agents loaded!")
 
-    if evaluate:
         print("Evaluating...")
+
         evaluate_single_env(env, agents)
 
 if __name__ == '__main__':
