@@ -22,7 +22,7 @@ class A2C:
         gamma = 0.99,
         use_gae = False,
         gae_lambda = 0.95,
-        entropy_coef = 0.01,
+        entropy_coef = 0.05,
         value_loss_coef = 0.5,
         max_grad_norm = 0.5,
 

@@ -42,7 +42,7 @@ device = "cpu"
 
 # Environment settings
 num_steps = 5
-num_env_steps = 50000
+num_env_steps = 1000000
 
 # Environment wrappers
 wrappers = (
@@ -284,9 +284,9 @@ def evaluate(agents):
 
 def main():
 
-    agent_dir = "2023-11-01_17-23-35"
+    agent_dir = "2023-11-01_20-04-38"
 
-    train_new_agent = True
+    train_new_agent = False
 
     if train_new_agent:
 
