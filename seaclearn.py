@@ -18,31 +18,35 @@ from os import path
 
 from citylearn.citylearn import CityLearnEnv, EvaluationCondition
 
-# Dataset information
+config = {
+    # Dataset information
+    # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    "num_procs": 4,
+    "time_limit": 1000,
+    "seed": 42,
 
-dataset_name = './data/citylearn_challenge_2022_phase_1/schema.json'
-# dataset_name = 'citylearn_challenge_2022_phase_1'
-num_procs = 4
-time_limit = 1000
-seed = 42
+    # RL params
+    "gamma": 0.99,
+    "use_gae": False,
+    "gae_lambda": 0.95,
+    "use_proper_time_limits": True,
 
-# RL params
-gamma = 0.99
-use_gae = False
-gae_lambda = 0.95
-use_proper_time_limits = True
+    # Training params
+    "entropy_coef": 0.01,
+    "value_loss_coef": 0.5,
+    "seac_coef": 1.0,
+    "max_grad_norm": 0.5,
+    "device": "cpu",
 
-# Training params
-entropy_coef = 0.01
-value_loss_coef = 0.5
-seac_coef = 1.0
-max_grad_norm = 0.5
-device = "cpu"
-# variance = 0.5
-
-# Environment settings
-num_steps = 5
-num_env_steps = 1000000
+    # Environment settings
+    "num_steps": 5,
+    "num_env_steps": 500000,
+    
+    # Environment wrappers
+    "flatten_observation": True,
+    "flatten_action": True
+}
 
 # Environment wrappers
 wrappers = (
@@ -54,13 +58,13 @@ wrappers = (
 def init_agents(envs, obs):
 
     agents = [
-        A2C(i, osp, asp, num_processes=num_procs)
+        A2C(i, osp, asp, num_processes=config['num_procs'])
         for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space))
     ]
 
     for i in range(len(obs)):
         agents[i].storage.obs[0].copy_(obs[i])
-        agents[i].storage.to(device)
+        agents[i].storage.to(config['device'])
 
     return agents
 
@@ -73,13 +77,13 @@ def train(agents, envs):
     policy_losses, value_losses, rewards = [], [], []
 
     num_updates = (
-        int(num_env_steps) // num_steps // num_procs
+        int(config['num_env_steps']) // config['num_steps'] // config['num_procs']
     )
     # print current time
-    print('Started at:', datetime.datetime.now())
+    print('Started training at:', datetime.datetime.now())
     for j in range(1, num_updates + 1):
 
-        for step in range(num_steps):
+        for step in range(config['num_steps']):
             # Sample actions
             with torch.no_grad():
                 n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
@@ -118,11 +122,11 @@ def train(agents, envs):
 
 
         for agent in agents:
-            agent.compute_returns(use_gae, gamma, gae_lambda, use_proper_time_limits)
+            agent.compute_returns(config['use_gae'], config['gamma'], config['gae_lambda'], config['use_proper_time_limits'])
 
         total_policy_loss, total_value_loss = 0, 0
         for agent in agents:
-            loss = agent.update([a.storage for a in agents], value_loss_coef, entropy_coef, seac_coef, max_grad_norm, device)
+            loss = agent.update([a.storage for a in agents], config['value_loss_coef'], config['entropy_coef'], config['seac_coef'], config['max_grad_norm'], config['device'])
             total_policy_loss += loss['seac_policy_loss']
             total_value_loss += loss['seac_value_loss']
         policy_losses.append(total_policy_loss)
@@ -139,41 +143,59 @@ def train(agents, envs):
         # variance *= 0.999999
         # variance = max(0.01, variance)
 
-    print('Finished at:', datetime.datetime.now())
+    print('Finished training at:', datetime.datetime.now())
     return agents, policy_losses, value_losses, rewards
 
 
 # Save agent models
-def save_agents(agents):
+def save_results(agents, policy_losses, value_losses, rewards, run_nr, name):
 
-    now = datetime.datetime.now()
-    name = now.strftime("%Y-%m-%d_%H-%M-%S")
-
-    print(f"Saved agents in {name}")
-
-    save_dir = f"./results/trained_models/{name}"
+    save_dir = f"./results/{name}"
+    agents_dir = f"{save_dir}/agents/{run_nr}"
+    train_logs_dir = f"{save_dir}/train_logs/{run_nr}"
 
     for agent in agents:
-        save_at = path.join(save_dir, f"agent{agent.agent_id}")
+        save_at = f'{agents_dir}/agent{agent.agent_id}'
         os.makedirs(save_at, exist_ok=True)
         agent.save(save_at)
 
+    os.makedirs(f'{train_logs_dir}', exist_ok=True)
+    np.save(f'{train_logs_dir}/rewards.npy', np.array(rewards))
+    np.save(f'{train_logs_dir}/valueloss.npy', np.array(value_losses))
+    np.save(f'{train_logs_dir}/policyloss.npy', np.array(policy_losses))
+
+    print(f"Saved agents in {name}")
+
+# Save hyperparameters and other settings
+def save_config(config, name):
+
+    save_dir = f"./results/{name}"
+    os.makedirs(save_dir, exist_ok=True)
+
+    with open(f'{save_dir}/config.txt', 'w') as f:
+        for key, value in config.items():
+            f.write(f'{key}: {value}\n')
+
+
 # Load agent models
-def load_agents(envs, agent_dir, evaluation = False):
-    agents = []
+def load_agents(envs, name, evaluation = False):
+
     n = 1
-    save_dir = "./results/trained_models/"
+    run_nr = 0
+    save_dir = f"./results/{name}/agents/{run_nr}"
 
     if not evaluation:
-        n = num_procs
+        n = config['num_procs']
 
+    agents = []
     for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space)):
         agent = A2C(i, osp, asp, num_processes = n)
-        model_path = f"{save_dir}{agent_dir}/agent{i}"
+        model_path = f"{save_dir}/agent{i}"
         agent.restore(model_path)
         agents.append(agent)
 
     return agents
+
 
 def evaluate_single_env(env, agents, render=False, animation=False):
 
@@ -184,11 +206,11 @@ def evaluate_single_env(env, agents, render=False, animation=False):
 
     n_recurrent_hidden_states = [
         torch.zeros(
-            evaluation_steps, agent.model.recurrent_hidden_state_size, device=device
+            evaluation_steps, agent.model.recurrent_hidden_state_size, device=config['device']
         )
         for agent in agents
     ]
-    masks = torch.zeros(evaluation_steps, 1, device=device)
+    masks = torch.zeros(evaluation_steps, 1, device=config['device'])
     frames = []
 
     for j in range(evaluation_steps):
@@ -229,14 +251,15 @@ def evaluate_single_env(env, agents, render=False, animation=False):
     kpis = kpis.dropna(how='all')
     print(kpis)
 
+
 # Evaluate agents
 def evaluate(agents):
 
-    eval_envs = make_vec_envs(env_name=dataset_name,
-                              parallel=num_procs,
+    eval_envs = make_vec_envs(env_name=config['dataset_name'],
+                              parallel=config['num_procs'],
                               time_limit=None, # time_limit=time_limit,
                               wrappers=wrappers,
-                              device=device,
+                              device=config['device'],
                               monitor_dir=None
                               )
     n_obs = eval_envs.reset()
@@ -244,16 +267,16 @@ def evaluate(agents):
     ep_length = 7000
     n_recurrent_hidden_states = [
         torch.zeros(
-            ep_length, agent.model.recurrent_hidden_state_size, device=device
+            ep_length, agent.model.recurrent_hidden_state_size, device=config['device']
         )
         for agent in agents
     ]
 
-    masks = torch.zeros(ep_length, 1, device=device)
+    masks = torch.zeros(ep_length, 1, device=config['device'])
 
     performed_actions = []
 
-    done = np.array([False for _ in range(num_procs)])
+    done = np.array([False for _ in range(config['num_procs'])])
     for _ in range(ep_length):
         with torch.no_grad():
             n_value, n_action, n_recurrent_hidden_states = zip(
@@ -284,56 +307,60 @@ def evaluate(agents):
 
 def main():
 
-    agent_dir = "2023-11-01_20-04-38"
-
     train_new_agent = False
+    nr_runs = 3
 
     if train_new_agent:
 
-        # Make vectorized envs
-        torch.set_num_threads(1)
-        envs = make_vec_envs(env_name=dataset_name,
-                             parallel=num_procs,
-                             time_limit=None, # time_limit=time_limit,
-                             wrappers=wrappers,
-                             device=device,
-                             monitor_dir=None
-                             )
+        now = datetime.datetime.now()
+        name = "SEAC_" + now.strftime("%Y-%m-%d_%H-%M-%S")
+        print(f"Training new agent: {name}")
 
-        obs = envs.reset()
+        save_config(config, name)
 
-        # Initialize agents
-        agents = init_agents(envs, obs)
+        for run_nr in range(nr_runs):
+            
+            print("Starting run number:", run_nr)
 
-        # Train models
-        agents, policy_losses, value_losses, rewards = train(agents, envs)
+            # Make vectorized envs
+            torch.set_num_threads(1)
+            envs = make_vec_envs(env_name=config['dataset_name'],
+                                parallel=config['num_procs'],
+                                time_limit=None, # time_limit=time_limit,
+                                wrappers=wrappers,
+                                device=config['device'],
+                                monitor_dir=None
+                                )
 
-        # Save trained models
-        save_agents(agents)
-        print("Saved agent.")
+            obs = envs.reset()
 
-        envs.close()
+            # Initialize agents
+            agents = init_agents(envs, obs)
 
-        # Save results
-        value_losses = np.array(value_losses)
-        rewards = np.array(rewards)
-        exp_name = 'experiment_var05_10mil_0999999'
-        np.save(f'valueloss_{exp_name}.npy', value_losses)
-        np.save(f'rewards_{exp_name}.npy', rewards)
+            # Train models
+            agents, policy_losses, value_losses, rewards = train(agents, envs)
+
+            # Save trained models
+            save_results(agents, policy_losses, value_losses, rewards, run_nr, name)
+            print("Saved agent.")
+
+            envs.close()
 
     else:
-        env = make_env(env_name = dataset_name,
-               rank = 1,
-               time_limit=None,
-               wrappers = [],
-               monitor_dir = None)
+        name = "SEAC_2023-11-04_02-57-39"
+
+        env = make_env(env_name = config['dataset_name'],
+                       rank = 1,
+                       time_limit=None,
+                       wrappers = [],
+                       monitor_dir = None
+                       )
 
         print("Loading agents...")
-        agents = load_agents(env, agent_dir, evaluation = True)
+        agents = load_agents(env, name, evaluation = True)
         print("Agents loaded!")
 
         print("Evaluating...")
-
         evaluate_single_env(env, agents)
 
 if __name__ == '__main__':

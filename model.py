@@ -46,19 +46,18 @@ class Policy(nn.Module):
         # action = self.add_noise(action, variance)
 
         # Create alpha beta distribution
-        dist = D.Beta(alpha, beta) 
+        # print(alpha, beta)
+        beta_dist = D.Beta(alpha, beta)
 
         # Use rsample to obtain samples with reparameterization for gradient flow
-        action = dist.rsample() # Action is now a value between [0, 1]
+        action = beta_dist.rsample() # Action is now a value between [0, 1]
 
         # Calculate log probabilities
-        action_log_probs = dist.log_prob(action)
+        action = torch.clamp(action, 0.001, 0.999)
+        action_log_probs = beta_dist.log_prob(action)
 
         # Map action to a range between [-1, 1]
         action = action * 2 - 1
-
-        # Correct the action log probs for this new range
-        action_log_probs = action_log_probs - torch.log(torch.tensor(2.0))
 
         return value, action, action_log_probs, rnn_hxs
 
@@ -75,14 +74,14 @@ class Policy(nn.Module):
         # Create beta distribution
         beta_dist = D.Beta(alpha, beta)
 
-        # Calculate log probabilities for the original action by correcting
-        action_log_probs = beta_dist.log_prob(action) - torch.log(torch.tensor(2.0))
+        # Calculate log probabilities for the original action, but clamp the action to avoid numerical issues
+        action = torch.clamp(action, 0.001, 0.999)
+        action_log_probs = beta_dist.log_prob(action)
 
         # Calculate the distribution entropy for the beta distribution
         dist_entropy = beta_dist.entropy().mean()
 
         return value, action_log_probs, dist_entropy, rnn_hxs
-        # return value, None, None, rnn_hxs
 
 class NNBase(nn.Module):
     def __init__(self, recurrent, recurrent_input_size, hidden_size):
@@ -186,11 +185,11 @@ class MLPBase(NNBase):
             nn.ReLU(),
             init_(nn.Linear(hidden_size, hidden_size)),
             nn.ReLU(),
-            nn.Sequential(
-                init_(nn.Linear(hidden_size, 2 * num_outputs)),  # Output alpha and beta values
-                SoftplusAddOne()# Add 1 so alpha and beta are > 1
+            # nn.Sequential(
+                init_(nn.Linear(hidden_size, 2 * num_outputs)), # Output alpha and beta values
+                SoftplusAddOne() # Add 1 so alpha and beta are > 1
             ### http://proceedings.mlr.press/v70/chou17a/chou17a.pdf ###
-            )
+            # )
         )
 
         self.critic = nn.Sequential(
