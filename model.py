@@ -170,7 +170,7 @@ class SoftplusAddOne(nn.Module):
         return torch.nn.functional.softplus(x) + 1.0
 
 class MLPBase(NNBase):
-    def __init__(self, num_inputs, num_outputs, recurrent=False, hidden_size=64):
+    def __init__(self, num_inputs, num_outputs, recurrent=False, hidden_size=256):
         super(MLPBase, self).__init__(recurrent, num_inputs, hidden_size)
 
         if recurrent:

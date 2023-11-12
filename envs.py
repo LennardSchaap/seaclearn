@@ -45,7 +45,6 @@ def _make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = 
         else:
             start_pos = 0
             end_pos = 7759
-        ######
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
 
@@ -71,7 +70,7 @@ def make_vec_envs(
     if len(envs) == 1 or monitor_dir:
         envs = MADummyVecEnv(envs)
     else:
-        envs = SubprocVecEnv(envs, start_method="fork")
+        envs = SubprocVecEnv(envs, start_method="spawn")
 
     envs = VecPyTorch(envs, device)
     return envs
