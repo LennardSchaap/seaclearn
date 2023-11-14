@@ -1,9 +1,8 @@
-from wrappers import RecordEpisodeStatistics, SquashDones, FlattenObservation, FlattenAction
-from citylearn.wrappers import NormalizedObservationWrapper
+from wrappers import FlattenObservation, FlattenAction
+from citylearn.wrappers import NormalizedObservationWrapper, DiscreteActionWrapper
 import torch
 import os
 import datetime
-import sys
 
 from envs import make_env, make_vec_envs
 from a2c import A2C
@@ -13,11 +12,8 @@ import matplotlib.pyplot as plt
 matplotlib.use('TkAgg')
 from matplotlib.animation import FuncAnimation
 import numpy as np
-import uuid
-from os import path
-import pickle
 
-from citylearn.citylearn import CityLearnEnv, EvaluationCondition
+from citylearn.citylearn import EvaluationCondition
 
 config = {
     # Dataset information
@@ -48,24 +44,32 @@ config = {
     "flatten_observation": True,
     "flatten_action": True,
 
-    "recurrent_policy": True
+    "recurrent_policy": True,
+    "discrete_policy": False,
+    "default_bin_size": 3, # only used if discrete_policy is True
 }
 
 # Environment wrappers
-wrappers = (
-    FlattenObservation,
-    FlattenAction,
-)
+if config['discrete_policy']:
+    wrappers = (
+        DiscreteActionWrapper,
+    )
+else:
+    wrappers = (
+        FlattenObservation,
+        FlattenAction,
+    )
 
 # Initialize agents
 def init_agents(envs, obs):
 
     agents = [
-        A2C(i, osp, asp, num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'])
+        A2C(i, osp, asp, num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space))
     ]
 
     for i in range(len(obs)):
+        print(obs[0].shape)
         agents[i].storage.obs[0].copy_(obs[i])
         agents[i].storage.to(config['device'])
 
@@ -342,7 +346,7 @@ def evaluate(agents):
 
 def main():
 
-    train_new_agent = False
+    train_new_agent = True
     nr_runs = 3
 
     if train_new_agent:
@@ -362,6 +366,7 @@ def main():
                                 parallel=config['num_procs'],
                                 time_limit=None, # time_limit=time_limit,
                                 wrappers=wrappers,
+                                default_bin_size=config['default_bin_size'],
                                 device=config['device'],
                                 monitor_dir=None
                                 )
