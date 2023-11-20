@@ -10,7 +10,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnvW
 from stable_baselines3.common.vec_env.vec_video_recorder import VecVideoRecorder
 from stable_baselines3.common.vec_env.vec_normalize import VecNormalize as VecNormalize_
 
-from citylearn.wrappers import StableBaselines3Wrapper
+from citylearn.wrappers import StableBaselines3Wrapper, DiscreteActionWrapper
 from citylearn.citylearn import CityLearnEnv
 from wrappers import TimeLimit, Monitor
 
@@ -29,7 +29,7 @@ def make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = F
     env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
     return env
 
-def _make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = False, evaluate = False):
+def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_dir, random_start = False, evaluate = False):
 
     def _thunk():
 
@@ -45,14 +45,16 @@ def _make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = 
         else:
             start_pos = 0
             end_pos = 7759
-        ######
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
 
         if time_limit:
             env = TimeLimit(env, time_limit)
         for wrapper in wrappers:
-            env = wrapper(env)
+            if wrapper == DiscreteActionWrapper:
+                env = wrapper(env, default_bin_size=default_bin_size)
+            else:
+                env = wrapper(env)
         
         if monitor_dir:
             env = Monitor(env, monitor_dir, lambda ep: int(ep==0), force=True, uid=str(rank))
@@ -62,16 +64,16 @@ def _make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = 
     return _thunk
 
 def make_vec_envs(
-    env_name, parallel, time_limit, wrappers, device, monitor_dir=None
+    env_name, parallel, time_limit, wrappers, default_bin_size, device, monitor_dir=None
 ):
     envs = [
-        _make_env(env_name, i, time_limit, wrappers, monitor_dir) for i in range(parallel)
+        _make_env(env_name, i, time_limit, wrappers, default_bin_size, monitor_dir) for i in range(parallel)
     ]
 
     if len(envs) == 1 or monitor_dir:
         envs = MADummyVecEnv(envs)
     else:
-        envs = SubprocVecEnv(envs, start_method="fork")
+        envs = SubprocVecEnv(envs, start_method="spawn")
 
     envs = VecPyTorch(envs, device)
     return envs

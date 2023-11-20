@@ -2,87 +2,70 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.distributions as D
+
+from distributions import Categorical
+from utils import init
 from gym.spaces.utils import flatdim
 
-from utils import init
 
-class Policy(nn.Module):
+class Policy_discrete(nn.Module):
     def __init__(self, obs_space, action_space, base=None, base_kwargs=None):
-        super(Policy, self).__init__()
+        super(Policy_discrete, self).__init__()
 
         obs_shape = obs_space.shape
 
         if base_kwargs is None:
             base_kwargs = {}
 
-        num_actions = flatdim(action_space)
-        self.model = MLPBase(obs_shape[0], flatdim(action_space), **base_kwargs)
-        
+        self.base = MLPBase(obs_shape[0], **base_kwargs)
+
+        num_outputs = flatdim(action_space)
+        self.dist = Categorical(self.base.output_size, num_outputs)
+
     @property
     def is_recurrent(self):
-        return self.model.is_recurrent
+        return self.base.is_recurrent
 
     @property
     def recurrent_hidden_state_size(self):
         """Size of rnn_hx."""
-        return self.model.recurrent_hidden_state_size
+        return self.base.recurrent_hidden_state_size
 
     def forward(self, inputs, rnn_hxs, masks):
         raise NotImplementedError
 
-    def add_noise(self, action, variance, noise_clip=2.0):
-
-        noise = (variance**0.5)*torch.randn_like(action)
-        noise = torch.clamp(noise, -noise_clip, noise_clip)
-        action += noise
-        action = torch.clamp(action, -1, 1)
-
-        return action
-
     def act(self, inputs, rnn_hxs, masks, deterministic=False):
-        value, (alpha, beta), rnn_hxs = self.model(inputs, rnn_hxs, masks)
+        value, actor_features, rnn_hxs = self.base(inputs, rnn_hxs, masks)
+        dist = self.dist(actor_features)
 
-        # action = self.add_noise(action, variance)
+        if deterministic:
+            action = dist.mode()
+        else:
+            action = dist.sample()
 
-        # Create alpha beta distribution
-        dist = D.Beta(alpha, beta) 
+        action_log_probs = dist.log_probs(action)
 
-        # Use rsample to obtain samples with reparameterization for gradient flow
-        action = dist.rsample() # Action is now a value between [0, 1]
-
-        # Calculate log probabilities
-        action_log_probs = dist.log_prob(action)
-
-        # Map action to a range between [-1, 1]
-        action = action * 2 - 1
-
-        # Correct the action log probs for this new range
-        action_log_probs = action_log_probs - torch.log(torch.tensor(2.0))
-
+        dist_entropy = dist.entropy().mean()
+        
         return value, action, action_log_probs, rnn_hxs
 
     def get_value(self, inputs, rnn_hxs, masks):
-        value, _, _ = self.model(inputs, rnn_hxs, masks)
+        value, _, _ = self.base(inputs, rnn_hxs, masks)
         return value
-    
-    def evaluate_actions(self, inputs, rnn_hxs, masks, action): 
-        value, (alpha, beta), rnn_hxs = self.model(inputs, rnn_hxs, masks)
 
-        # Map action to a range between [0, 1]
-        action = (action + 1) / 2
+    def evaluate_actions(self, inputs, rnn_hxs, masks, action):
 
-        # Create beta distribution
-        beta_dist = D.Beta(alpha, beta)
+        value, actor_features, rnn_hxs = self.base(inputs, rnn_hxs, masks)
+        dist = self.dist(actor_features)
 
-        # Calculate log probabilities for the original action by correcting
-        action_log_probs = beta_dist.log_prob(action) - torch.log(torch.tensor(2.0))
+        # Added this to fix discrete action
+        action = torch.max(action, dim=1).values
 
-        # Calculate the distribution entropy for the beta distribution
-        dist_entropy = beta_dist.entropy().mean()
+        action_log_probs = dist.log_probs(action)
+        dist_entropy = dist.entropy().mean()
 
         return value, action_log_probs, dist_entropy, rnn_hxs
-        # return value, None, None, rnn_hxs
+
 
 class NNBase(nn.Module):
     def __init__(self, recurrent, recurrent_input_size, hidden_size):
@@ -166,12 +149,9 @@ class NNBase(nn.Module):
 
         return x, hxs
 
-class SoftplusAddOne(nn.Module):
-    def forward(self, x):
-        return torch.nn.functional.softplus(x) + 1.0
 
 class MLPBase(NNBase):
-    def __init__(self, num_inputs, num_outputs, recurrent=False, hidden_size=64):
+    def __init__(self, num_inputs, recurrent=False, hidden_size=64):
         super(MLPBase, self).__init__(recurrent, num_inputs, hidden_size)
 
         if recurrent:
@@ -186,11 +166,6 @@ class MLPBase(NNBase):
             nn.ReLU(),
             init_(nn.Linear(hidden_size, hidden_size)),
             nn.ReLU(),
-            nn.Sequential(
-                init_(nn.Linear(hidden_size, 2 * num_outputs)),  # Output alpha and beta values
-                SoftplusAddOne()# Add 1 so alpha and beta are > 1
-            ### http://proceedings.mlr.press/v70/chou17a/chou17a.pdf ###
-            )
         )
 
         self.critic = nn.Sequential(
@@ -212,6 +187,5 @@ class MLPBase(NNBase):
 
         hidden_critic = self.critic(x)
         hidden_actor = self.actor(x)
-        alpha, beta = hidden_actor.chunk(2, dim=-1)
 
-        return self.critic_linear(hidden_critic), (alpha, beta), rnn_hxs
+        return self.critic_linear(hidden_critic), hidden_actor, rnn_hxs
