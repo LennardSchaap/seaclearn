@@ -115,7 +115,6 @@ class A2C:
         policy_loss = -(advantages.detach()).mean()
         value_loss = advantages.pow(2).mean()
 
-
         # calculate prediction loss for the OTHER actor
         other_agent_ids = [x for x in range(len(storages)) if x != self.agent_id]
         seac_policy_loss = 0
@@ -140,7 +139,7 @@ class A2C:
                 logp.exp() / (storages[oid].action_log_probs.exp() + 1e-7)
             ).detach()
             # importance_sampling = 1.0 # This was commented out before
-            
+
             seac_value_loss += (
                 importance_sampling * other_advantage.pow(2)
             ).mean()

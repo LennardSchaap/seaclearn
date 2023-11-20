@@ -8,7 +8,7 @@ def plot(filenames, labels):
     for filename in filenames:
         for i in range(len(labels)):
             data = np.load(labels[i]+filename+'.npy')
-            data = smooth(data, 1000)
+            data = smooth(data, 100)
             axs[i].plot(data, label=labels[i]+filename, lw=0.75)
     axs[0].legend()
     axs[1].legend()
@@ -16,7 +16,7 @@ def plot(filenames, labels):
     axs[1].set_xlabel('time step')
     axs[0].set_ylabel('reward')
     axs[1].set_ylabel('value loss')
-    axs[1].set_ylim(0, 1000)
+    axs[1].set_ylim(0, 20000)
 
     if not os.path.exists('results/plots'):
         os.makedirs('results/plots')
