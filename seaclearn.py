@@ -15,6 +15,11 @@ import numpy as np
 
 from citylearn.citylearn import EvaluationCondition
 
+# SEAC_2023-11-20_17-40-38: Discreet no recurrent
+# SEAC_2023-11-20_17-34-18: Continuous wel recurrent
+# SEAC_2023-11-20_16-49-16: Discreet wel recurrent
+# SEAC_2023-11-20_17-43-35: Continuous no recurrent
+
 config = {
     # Dataset information
     "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
@@ -38,13 +43,13 @@ config = {
 
     # Environment settings
     "num_steps": 5,
-    "num_env_steps": 1000000,
+    "num_env_steps": 100000,
     
     # Environment wrappers
     "flatten_observation": True,
     "flatten_action": True,
 
-    "recurrent_policy": True,
+    "recurrent_policy": False,
     "discrete_policy": True,
     "default_bin_size": 3, # only used if discrete_policy is True
 }
@@ -114,8 +119,10 @@ def train(agents, envs):
                     for info in infos
                 ]
             )
+            
             # Store relevant information
             for i in range(len(agents)):
+                print(n_action[i])
                 agents[i].storage.insert(
                     obs[i],
                     n_recurrent_hidden_states[i],
@@ -126,6 +133,7 @@ def train(agents, envs):
                     masks,
                     bad_masks,
                 )
+            print("  ")
 
         # Compute returns for each agent
         for agent in agents:
@@ -212,13 +220,12 @@ def load_agents(envs, name, evaluation = False):
 
     agents = []
     for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space)):
-        agent = A2C(i, osp, asp, num_processes = n, recurrent_policy = config['recurrent_policy'])
+        agent = A2C(i, osp, asp, num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         model_path = f"{save_dir}/agent{i}"
         agent.restore(model_path)
         agents.append(agent)
 
     return agents
-
 
 # Evaluate function without vectorized envs
 def evaluate_single_env(env, agents, render=False, animation=False):
@@ -248,6 +255,7 @@ def evaluate_single_env(env, agents, render=False, animation=False):
                     obs[i],
                     n_recurrent_hidden_states[i],
                     masks[i],
+                    deterministic = True
                 )
                 for i, agent in enumerate(agents)
             ]
@@ -293,63 +301,9 @@ def evaluate_single_env(env, agents, render=False, animation=False):
 
     env.close()
 
-
-# Evaluate function with vectorized envs (isn't currently used)
-def evaluate(agents):
-
-    eval_envs = make_vec_envs(env_name=config['dataset_name'],
-                              parallel=config['num_procs'],
-                              time_limit=None, # time_limit=time_limit,
-                              wrappers=wrappers,
-                              device=config['device'],
-                              monitor_dir=None,
-                              evaluate=True
-                              )
-    n_obs = eval_envs.reset()
-
-    ep_length = 1000
-    n_recurrent_hidden_states = [
-        torch.zeros(
-            ep_length, agent.model.recurrent_hidden_state_size, device=config['device']
-        )
-        for agent in agents
-    ]
-
-    masks = torch.zeros(ep_length, 1, device=config['device'])
-
-    performed_actions = []
-
-    for _ in range(ep_length):
-        with torch.no_grad():
-            n_value, n_action, n_recurrent_hidden_states = zip(
-                *[
-                    agent.model.act(
-                        n_obs[agent.agent_id], recurrent_hidden_states, masks, 0.000001
-                    )
-                    for agent, recurrent_hidden_states in zip(
-                        agents, n_recurrent_hidden_states
-                    )
-                ]
-            )
-        n_obs, rewards, done, infos = eval_envs.step(n_action)
-
-        actions = []
-        for tensor in n_action:
-            action = tensor.detach().cpu().numpy()[0]
-            actions.append(action)
-        performed_actions.append(actions)
-
-    kpis = eval_envs.env_method("evaluate", baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV, indices=0)[0]
-    kpis = kpis.pivot(index='cost_function', columns='name', values='value')
-    kpis = kpis.dropna(how='all')
-    print(kpis)
-
-    eval_envs.close()
-
-
 def main():
 
-    train_new_agent = True
+    train_new_agent = False
     nr_runs = 3
 
     if train_new_agent:
@@ -390,12 +344,14 @@ def main():
 
     else:
 
-        name = "SEAC_2023-11-10_12-54-45" # name of the model to load
+        name = "DiscNotRec" # name of the model to load
 
+        print(wrappers)
         env = make_env(env_name = config['dataset_name'],
                        rank = 1,
                        time_limit=None,
-                       wrappers = [],
+                       wrappers = wrappers,
+                       default_bin_size=config['default_bin_size'],
                        monitor_dir = None
                        )
 

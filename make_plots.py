@@ -8,7 +8,6 @@ def plot(names, smooth_data=False, window_size=100):
     entropy_coef = 0.05
     seac_coef = 1.0
 
-
     # Create plot per trained model and average over all runs and also show the standard deviation
     # number of runs can be different for each model
     fig, axs = plt.subplots(4, 1, figsize=(15, 6))
@@ -108,10 +107,10 @@ def smooth(data, window_size):
 
 def main():
 
-    names = os.listdir('results/')
-    names.remove('all_plots.png')
+    # names = os.listdir('results/')
+    # names.remove('all_plots.png')
 
-    names = ['SEAC_2023-11-10_12-33-02', 'SEAC_2023-11-10_12-54-45'] # testing
+    names = ['ContNotRec', 'ContRec', 'DiscNotRec', 'DiscRec'] # testing
 
     smooth_data = True
     window_size = 100

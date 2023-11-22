@@ -64,6 +64,11 @@ class RolloutStorage(object):
         self.obs[self.step + 1].copy_(obs)
         self.recurrent_hidden_states[self.step + 1].copy_(recurrent_hidden_states)
         self.actions[self.step].copy_(actions)
+
+        #View action shape
+        print(self.actions.view(-1, 6))
+        print("insert:", self.actions.size()[-1])
+
         self.action_log_probs[self.step].copy_(action_log_probs)
         self.value_preds[self.step].copy_(value_preds)
         self.rewards[self.step].copy_(rewards)

@@ -21,12 +21,19 @@ class MADummyVecEnv(DummyVecEnv):
         # change this because we want >1 reward
         self.buf_rews = np.zeros((self.num_envs, agents), dtype=np.float32)
 
-def make_env(env_name, rank, time_limit, wrappers, monitor_dir, random_start = False, evaluate = False):
+def make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_dir, random_start = False, evaluate = False):
 
     start_pos = 7759
     end_pos = 8759
 
     env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
+
+    for wrapper in wrappers:
+        if wrapper == DiscreteActionWrapper:
+            env = wrapper(env, default_bin_size=default_bin_size)
+        else:
+            env = wrapper(env)
+
     return env
 
 def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_dir, random_start = False, evaluate = False):

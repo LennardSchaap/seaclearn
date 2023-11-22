@@ -46,7 +46,7 @@ class Policy_discrete(nn.Module):
         action_log_probs = dist.log_probs(action)
 
         dist_entropy = dist.entropy().mean()
-        
+
         return value, action, action_log_probs, rnn_hxs
 
     def get_value(self, inputs, rnn_hxs, masks):
@@ -59,7 +59,7 @@ class Policy_discrete(nn.Module):
         dist = self.dist(actor_features)
 
         # Added this to fix discrete action
-        action = torch.max(action, dim=1).values
+        # action = torch.max(action, dim=1).values
 
         action_log_probs = dist.log_probs(action)
         dist_entropy = dist.entropy().mean()
