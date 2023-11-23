@@ -43,7 +43,7 @@ config = {
 
     # Environment settings
     "num_steps": 5,
-    "num_env_steps": 100000,
+    "num_env_steps": 1000,
     
     # Environment wrappers
     "flatten_observation": True,
@@ -54,18 +54,17 @@ config = {
     "default_bin_size": 3, # only used if discrete_policy is True
 }
 
+evaluate = True
+
 # Environment wrappers
+wrappers = []
+
 if config['discrete_policy']:
-    wrappers = (
-        DiscreteActionWrapper,
-        FlattenObservation,
-        FlattenAction,
-    )
-else:
-    wrappers = (
-        FlattenObservation,
-        FlattenAction,
-    )
+    wrappers.append(DiscreteActionWrapper)
+
+if not evaluate:
+    wrappers.append(FlattenObservation)
+    wrappers.append(FlattenAction)
 
 # Initialize agents
 def init_agents(envs, obs):
@@ -250,26 +249,14 @@ def evaluate_single_env(env, agents, render=False, animation=False):
     frames = []
     for j in range(evaluation_steps):
 
-        n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
-            *[
-                agent.model.act(
-                    obs[i],
-                    n_recurrent_hidden_states[i],
-                    masks[i],
-                    deterministic = True
-                )
-                for i, agent in enumerate(agents)
-            ]
-        )
+        n_actions = []
+        for i, agent in enumerate(agents):
+            with torch.no_grad():
+                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks)
+                n_actions.append(n_action)
 
-        # n_actions = []
-        # for i, agent in enumerate(agents):
-        #     with torch.no_grad():
-        #         n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks)
-        #         n_actions.append(n_action)
-
-        # n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
-        obs, rewards, done, info = env.step(n_action)
+        n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
+        obs, rewards, done, info = env.step(n_actions)
         obs = torch.tensor(obs, dtype=torch.float32)
 
         if render and not j % render_freq:
@@ -304,10 +291,9 @@ def evaluate_single_env(env, agents, render=False, animation=False):
 
 def main():
 
-    train_new_agent = False
-    nr_runs = 3
+    nr_runs = 1
 
-    if train_new_agent:
+    if not evaluate:
 
         now = datetime.datetime.now()
         name = "SEAC_" + now.strftime("%Y-%m-%d_%H-%M-%S")
@@ -345,7 +331,7 @@ def main():
 
     else:
 
-        name = "DiscNotRec" # name of the model to load
+        name = "SEAC_2023-11-23_20-50-49" # name of the model to load
 
         env = make_env(env_name = config['dataset_name'],
                        rank = 1,
