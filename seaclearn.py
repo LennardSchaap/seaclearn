@@ -235,6 +235,7 @@ def evaluate_single_env(env, agents, render=False, animation=False):
     render_freq = 10
 
     obs = env.reset()
+    print(obs)
     obs = torch.tensor(obs, dtype=torch.float32)
     
     # Initialize recurrent hidden states and masks for recurrent policies
@@ -346,7 +347,6 @@ def main():
 
         name = "DiscNotRec" # name of the model to load
 
-        print(wrappers)
         env = make_env(env_name = config['dataset_name'],
                        rank = 1,
                        time_limit=None,
