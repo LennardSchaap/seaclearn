@@ -22,8 +22,8 @@ from citylearn.citylearn import EvaluationCondition
 
 config = {
     # Dataset information
-    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
-    # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "time_limit": 1000,
     "seed": 42,
@@ -45,16 +45,12 @@ config = {
     "num_steps": 5,
     "num_env_steps": 1000,
     
-    # Environment wrappers
-    "flatten_observation": True,
-    "flatten_action": True,
-
-    "recurrent_policy": False,
+    "recurrent_policy": True,
     "discrete_policy": True,
     "default_bin_size": 3, # only used if discrete_policy is True
 }
 
-evaluate = True
+evaluate = False
 
 # Environment wrappers
 wrappers = []
@@ -248,14 +244,26 @@ def evaluate_single_env(env, agents, render=False, animation=False):
     frames = []
     for j in range(evaluation_steps):
 
-        n_actions = []
-        for i, agent in enumerate(agents):
-            with torch.no_grad():
-                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks)
-                n_actions.append(n_action)
+        n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
+            *[
+                agent.model.act(
+                    obs[i],
+                    n_recurrent_hidden_states[i],
+                    masks[i],
+                    deterministic = True
+                )
+                for i, agent in enumerate(agents)
+            ]
+        )
 
-        n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
-        obs, rewards, done, info = env.step(n_actions)
+        # n_actions = []
+        # for i, agent in enumerate(agents):
+        #     with torch.no_grad():
+        #         n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks, deterministic=True)
+        #         n_actions.append(n_action)
+
+        n_action = [tensor.detach().cpu().numpy() for tensor in n_action]
+        obs, rewards, done, info = env.step(n_action)
         obs = torch.tensor(obs, dtype=torch.float32)
 
         if render and not j % render_freq:
@@ -330,7 +338,7 @@ def main():
 
     else:
 
-        name = "SEAC_2023-11-23_20-50-49" # name of the model to load
+        name = "SEAC_2023-11-23_21-01-48" # name of the model to load
 
         print(wrappers)
         env = make_env(env_name = config['dataset_name'],
