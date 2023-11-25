@@ -1,4 +1,4 @@
-from wrappers import FlattenObservation, FlattenAction
+from wrappers import FlattenObservation, FlattenAction, DiscreteActionWrapperFix
 from citylearn.wrappers import NormalizedObservationWrapper, DiscreteActionWrapper
 import torch
 import os
@@ -43,9 +43,9 @@ config = {
 
     # Environment settings
     "num_steps": 5,
-    "num_env_steps": 1000,
+    "num_env_steps": 100000,
     
-    "recurrent_policy": True,
+    "recurrent_policy": False,
     "discrete_policy": True,
     "default_bin_size": 3, # only used if discrete_policy is True
 }
@@ -56,11 +56,12 @@ evaluate = False
 wrappers = []
 
 if config['discrete_policy']:
-    wrappers.append(DiscreteActionWrapper)
-
+    wrappers.append(DiscreteActionWrapperFix)
+else:
+    if not evaluate:
+        wrappers.append(FlattenAction)
 if not evaluate:
     wrappers.append(FlattenObservation)
-    wrappers.append(FlattenAction)
 
 # Initialize agents
 def init_agents(envs, obs):
@@ -71,7 +72,6 @@ def init_agents(envs, obs):
     ]
 
     for i in range(len(obs)):
-        print(obs[0].shape)
         agents[i].storage.obs[0].copy_(obs[i])
         agents[i].storage.to(config['device'])
 
@@ -103,7 +103,7 @@ def train(agents, envs):
                     ]
                 )
 
-            obs, reward, done, infos = envs.step(n_action)            
+            obs, reward, done, infos = envs.step(n_action)      
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
@@ -117,7 +117,6 @@ def train(agents, envs):
             
             # Store relevant information
             for i in range(len(agents)):
-                print(n_action[i])
                 agents[i].storage.insert(
                     obs[i],
                     n_recurrent_hidden_states[i],
@@ -128,7 +127,6 @@ def train(agents, envs):
                     masks,
                     bad_masks,
                 )
-            print("  ")
 
         # Compute returns for each agent
         for agent in agents:
@@ -338,9 +336,8 @@ def main():
 
     else:
 
-        name = "SEAC_2023-11-23_21-01-48" # name of the model to load
+        name = "SEAC_2023-11-25_01-53-00" # name of the model to load
 
-        print(wrappers)
         env = make_env(env_name = config['dataset_name'],
                        rank = 1,
                        time_limit=None,

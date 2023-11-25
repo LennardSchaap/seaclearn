@@ -45,7 +45,7 @@ class A2C:
         self.action_size = flatdim(action_space)
         self.obs_space = obs_space
         self.action_space = action_space
-        print("action space:", action_space)
+        
         if discrete_policy:
             self.model = Policy_discrete(
                 obs_space, action_space, base_kwargs={"recurrent": recurrent_policy},
@@ -104,7 +104,6 @@ class A2C:
 
         obs_shape = self.storage.obs.size()[2:]
         action_shape = self.storage.actions.size()[-1]
-        print("action shape", action_shape)
         num_steps, num_processes, _ = self.storage.rewards.size()
 
         values, action_log_probs, dist_entropy, _ = self.model.evaluate_actions(
