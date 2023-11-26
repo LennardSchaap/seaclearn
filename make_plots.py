@@ -107,10 +107,8 @@ def smooth(data, window_size):
 
 def main():
 
-    # names = os.listdir('results/')
-    # names.remove('all_plots.png')
-
-    # names = ['ContNotRec', 'DiscNotRec'] 
+    names = os.listdir('results/')
+    names.remove('all_plots.png')
 
     names = ['ContNotRec', 'ContRec', 'DiscNotRec', 'DiscRec'] # testing
 

@@ -1,4 +1,4 @@
-from wrappers import FlattenObservation, FlattenAction
+from wrappers import FlattenObservation, FlattenAction, DiscreteActionWrapperFix
 from citylearn.wrappers import NormalizedObservationWrapper, DiscreteActionWrapper
 import torch
 import os
@@ -22,8 +22,8 @@ from citylearn.citylearn import EvaluationCondition
 
 config = {
     # Dataset information
-    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
-    # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "time_limit": 1000,
     "seed": 42,
@@ -43,28 +43,25 @@ config = {
 
     # Environment settings
     "num_steps": 5,
-    "num_env_steps": 1000,
+    "num_env_steps": 100000,
     
-    # Environment wrappers
-    "flatten_observation": True,
-    "flatten_action": True,
-
     "recurrent_policy": False,
     "discrete_policy": True,
     "default_bin_size": 3, # only used if discrete_policy is True
 }
 
-evaluate = True
+evaluate = False
 
 # Environment wrappers
 wrappers = []
 
 if config['discrete_policy']:
-    wrappers.append(DiscreteActionWrapper)
-
+    wrappers.append(DiscreteActionWrapperFix)
+else:
+    if not evaluate:
+        wrappers.append(FlattenAction)
 if not evaluate:
     wrappers.append(FlattenObservation)
-    wrappers.append(FlattenAction)
 
 # Initialize agents
 def init_agents(envs, obs):
@@ -75,7 +72,6 @@ def init_agents(envs, obs):
     ]
 
     for i in range(len(obs)):
-        print(obs[0].shape)
         agents[i].storage.obs[0].copy_(obs[i])
         agents[i].storage.to(config['device'])
 
@@ -107,7 +103,7 @@ def train(agents, envs):
                     ]
                 )
 
-            obs, reward, done, infos = envs.step(n_action)            
+            obs, reward, done, infos = envs.step(n_action)      
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
@@ -121,7 +117,6 @@ def train(agents, envs):
             
             # Store relevant information
             for i in range(len(agents)):
-                print(n_action[i])
                 agents[i].storage.insert(
                     obs[i],
                     n_recurrent_hidden_states[i],
@@ -132,7 +127,6 @@ def train(agents, envs):
                     masks,
                     bad_masks,
                 )
-            print("  ")
 
         # Compute returns for each agent
         for agent in agents:
@@ -254,8 +248,8 @@ def evaluate_single_env(env, agents, render=False, animation=False):
                 n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks, deterministic = False)
                 n_actions.append(n_action)
 
-        n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
-        obs, rewards, done, info = env.step(n_actions)
+        n_action = [tensor.detach().cpu().numpy() for tensor in n_action]
+        obs, rewards, done, info = env.step(n_action)
         obs = torch.tensor(obs, dtype=torch.float32)
 
         if render and not j % render_freq:
@@ -346,7 +340,6 @@ def main():
 
         print("Evaluating...")
         evaluate_single_env(env, agents)
-
 
 if __name__ == '__main__':
     main()
