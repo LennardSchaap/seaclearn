@@ -216,5 +216,5 @@ class DiscreteActionWrapperFix(ActionWrapper):
                 transformed_actions_.append(a)
             
             transformed_actions.append(transformed_actions_)
-
+        # print(actions, transformed_actions)
         return transformed_actions

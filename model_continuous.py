@@ -47,11 +47,14 @@ class Policy_continuous(nn.Module):
         # action = self.add_noise(action, variance)
 
         # Create alpha beta distribution
-        # print(alpha, beta)
+        beta += 0.0001 # Add small value in case alpha and beta are 1
         beta_dist = D.Beta(alpha, beta)
 
         # Use rsample to obtain samples with reparameterization for gradient flow
-        action = beta_dist.rsample() # Action is now a value between [0, 1]
+        if deterministic:
+            action = beta_dist.mode
+        else:
+            action = beta_dist.rsample() # Action is now a value between [0, 1]
 
         # Calculate log probabilities
         action = torch.clamp(action, 0.001, 0.999)
