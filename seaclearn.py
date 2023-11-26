@@ -22,8 +22,8 @@ from citylearn.citylearn import EvaluationCondition
 
 config = {
     # Dataset information
-    # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
-    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "time_limit": 1000,
     "seed": 42,
@@ -47,10 +47,10 @@ config = {
     
     "recurrent_policy": False,
     "discrete_policy": True,
-    "default_bin_size": 3, # only used if discrete_policy is True
+    "default_bin_size": 10, # only used if discrete_policy is True
 }
 
-evaluate = False
+evaluate = True
 
 # Environment wrappers
 wrappers = []
@@ -199,7 +199,6 @@ def save_config(config, name):
     with open(f'{save_dir}/config.txt', 'w') as f:
         for key, value in config.items():
             f.write(f'{key}: {value}\n')
-
 
 # Load agent models
 def load_agents(envs, name, evaluation = False):
