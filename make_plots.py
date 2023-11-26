@@ -10,7 +10,7 @@ def plot(names, smooth_data=False, window_size=100):
 
     # Create plot per trained model and average over all runs and also show the standard deviation
     # number of runs can be different for each model
-    fig, axs = plt.subplots(4, 1, figsize=(15, 6))
+    fig, axs = plt.subplots(4, 1, figsize=(30, 12))
 
     for name in names:
 
@@ -110,10 +110,10 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
-    # names = ['ContNotRec', 'ContRec', 'DiscNotRec', 'DiscRec'] # testing
+    # names = ['ContNoRec2Mil', 'DiscNoRec2Mil'] # testing
 
     smooth_data = True
-    window_size = 100
+    window_size = 1000
     plot(names, smooth_data, window_size)
 
 

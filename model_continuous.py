@@ -18,7 +18,6 @@ class Policy_continuous(nn.Module):
             base_kwargs = {}
 
         num_actions = flatdim(action_space)
-        print(num_actions)
         self.model = MLPBase(obs_shape[0], num_actions, **base_kwargs)
         
     @property
