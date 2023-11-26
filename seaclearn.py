@@ -234,7 +234,6 @@ def evaluate_single_env(env, agents, render=False, animation=False):
     render_freq = 10
 
     obs = env.reset()
-    print(obs)
     obs = torch.tensor(obs, dtype=torch.float32)
     
     # Initialize recurrent hidden states and masks for recurrent policies
@@ -252,7 +251,7 @@ def evaluate_single_env(env, agents, render=False, animation=False):
         n_actions = []
         for i, agent in enumerate(agents):
             with torch.no_grad():
-                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks)
+                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks, deterministic = False)
                 n_actions.append(n_action)
 
         n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
@@ -331,7 +330,7 @@ def main():
 
     else:
 
-        name = "SEAC_2023-11-23_20-50-49" # name of the model to load
+        name = "DiscNotRec" # name of the model to load
 
         env = make_env(env_name = config['dataset_name'],
                        rank = 1,

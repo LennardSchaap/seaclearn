@@ -95,7 +95,7 @@ def plot(names, smooth_data=False, window_size=100):
     axs[3].set_ylabel('total loss')
 
     # axs[0].set_ylim(-8, 0)
-    # axs[1].set_ylim(0, 100000)
+    axs[1].set_ylim(0, 100)
     # axs[2].set_ylim(-300,300)
     plt.tight_layout()
     plt.savefig('results/all_plots.png')
@@ -109,6 +109,8 @@ def main():
 
     # names = os.listdir('results/')
     # names.remove('all_plots.png')
+
+    # names = ['ContNotRec', 'DiscNotRec'] 
 
     names = ['ContNotRec', 'ContRec', 'DiscNotRec', 'DiscRec'] # testing
 
