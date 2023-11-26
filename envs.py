@@ -12,7 +12,7 @@ from stable_baselines3.common.vec_env.vec_normalize import VecNormalize as VecNo
 
 from citylearn.wrappers import StableBaselines3Wrapper, DiscreteActionWrapper
 from citylearn.citylearn import CityLearnEnv
-from wrappers import TimeLimit, Monitor
+from wrappers import TimeLimit, Monitor, DiscreteActionWrapperFix
 
 class MADummyVecEnv(DummyVecEnv):
     def __init__(self, env_fns):
@@ -29,7 +29,7 @@ def make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_dir
     env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
 
     for wrapper in wrappers:
-        if wrapper == DiscreteActionWrapper:
+        if wrapper == DiscreteActionWrapper or wrapper == DiscreteActionWrapperFix:
             env = wrapper(env, default_bin_size=default_bin_size)
         else:
             env = wrapper(env)
@@ -58,7 +58,7 @@ def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_di
         if time_limit:
             env = TimeLimit(env, time_limit)
         for wrapper in wrappers:
-            if wrapper == DiscreteActionWrapper:
+            if wrapper == DiscreteActionWrapper or wrapper == DiscreteActionWrapperFix:
                 env = wrapper(env, default_bin_size=default_bin_size)
             else:
                 env = wrapper(env)
