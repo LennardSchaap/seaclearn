@@ -151,11 +151,11 @@ def train(agents, envs):
         seac_value_losses.append(total_value_loss)
         rewards.append(np.array(reward).sum(axis=1).mean())
 
-        # if j & 100 == 0:
-        #     print("Mean reward: ", np.array(reward).sum(axis=1).mean())
-        #     print("Policy loss: ", total_policy_loss)
-        #     print("Value loss: ", total_value_loss)
-        #     print("Total loss?: ", total_policy_loss + total_value_loss - total_dist_entropy + total_seac_policy_loss + total_seac_value_loss)
+        if j & 100 == 0:
+            print("Mean reward: ", np.array(reward).sum(axis=1).mean())
+            print("Policy loss: ", total_policy_loss)
+            print("Value loss: ", total_value_loss)
+            print("Total loss?: ", total_policy_loss + total_value_loss - total_dist_entropy + total_seac_policy_loss + total_seac_value_loss)
         
         for agent in agents:
             agent.storage.after_update()
