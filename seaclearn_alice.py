@@ -44,7 +44,7 @@ config = {
     "default_bin_size": 3, # only used if discrete_policy is True
 }
 
-evaluate = False
+evaluate = True
 
 # Environment wrappers
 wrappers = []
@@ -333,7 +333,7 @@ def main():
 
     else:
 
-        name = "SEAC_2023-11-29_13-48-53" # name of the model to load
+        name = "SEAC_2023-11-30_23-38-22" # name of the model to load
         render = False
         animation = False
 
