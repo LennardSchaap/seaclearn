@@ -9,7 +9,7 @@ from a2c import A2C
 
 import matplotlib
 import matplotlib.pyplot as plt
-matplotlib.use('TkAgg')
+
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
