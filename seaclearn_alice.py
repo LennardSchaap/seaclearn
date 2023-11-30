@@ -20,7 +20,7 @@ config = {
     # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
     "dataset_name": "/home/s1914839/data1/data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 8,
-    "seed": 42,
+    "seed": 33,
 
     # RL params
     "gamma": 0.99,
@@ -30,8 +30,8 @@ config = {
 
     # Training params
     "entropy_coef": 0.05,
-    "value_loss_coef": 0.05,
-    "seac_coef": 1,
+    "value_loss_coef": 0.1,
+    "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
 

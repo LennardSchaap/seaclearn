@@ -30,13 +30,13 @@ config = {
 
     # Training params
     "entropy_coef": 0.05,
-    "value_loss_coef": 0.05,
-    "seac_coef": 1,
+    "value_loss_coef": 0.1,
+    "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
 
     # Environment settings
-    "num_steps": 1000000,
+    "num_steps": 10000000,
     "num_env_steps": 2,
     
     "recurrent_policy": False,
