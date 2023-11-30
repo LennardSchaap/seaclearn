@@ -94,7 +94,7 @@ def plot(names, smooth_data=False, window_size=100):
     axs[2].set_ylabel('policy loss')
     axs[3].set_ylabel('total loss')
 
-    # axs[0].set_ylim(-8, 0)
+    axs[0].set_ylim(top=0)
     axs[1].set_ylim(0, 100)
     # axs[2].set_ylim(-300,300)
     plt.tight_layout()
@@ -110,7 +110,11 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
+<<<<<<< HEAD
     names = ['SEAC_2023-11-29_13-49-34'] # testing
+=======
+    # names = ['ContNoRec2Mil', '10DiscNoRec2Mil'] # testing
+>>>>>>> 0875d32ad2499afd6ea89415c207217824bcd90d
 
     smooth_data = True
     window_size = 1000
