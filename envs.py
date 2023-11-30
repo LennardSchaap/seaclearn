@@ -40,10 +40,10 @@ def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_di
 
     def _thunk():
 
-        seed = 777
+        seed = 123
 
         start_pos = 0
-        end_pos = 7759
+        end_pos = 1000
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
 
