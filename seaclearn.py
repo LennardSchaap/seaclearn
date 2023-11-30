@@ -15,17 +15,11 @@ import numpy as np
 
 from citylearn.citylearn import EvaluationCondition
 
-# SEAC_2023-11-20_17-40-38: Discreet no recurrent
-# SEAC_2023-11-20_17-34-18: Continuous wel recurrent
-# SEAC_2023-11-20_16-49-16: Discreet wel recurrent
-# SEAC_2023-11-20_17-43-35: Continuous no recurrent
-
 config = {
     # Dataset information
-    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
-    # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
-    "num_procs": 4,
-    "time_limit": 1000,
+    # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    "num_procs": 8,
     "seed": 42,
 
     # RL params
@@ -36,21 +30,21 @@ config = {
 
     # Training params
     "entropy_coef": 0.05,
-    "value_loss_coef": 0.5,
-    "seac_coef": 1.0,
+    "value_loss_coef": 0.05,
+    "seac_coef": 1,
     "max_grad_norm": 0.5,
     "device": "cpu",
 
     # Environment settings
-    "num_steps": 5,
-    "num_env_steps": 2000000,
+    "num_steps": 1000000,
+    "num_env_steps": 2,
     
     "recurrent_policy": False,
     "discrete_policy": True,
-    "default_bin_size": 10, # only used if discrete_policy is True
+    "default_bin_size": 3, # only used if discrete_policy is True
 }
 
-evaluate = True
+evaluate = False
 
 # Environment wrappers
 wrappers = []
@@ -69,7 +63,7 @@ if not evaluate:
 def init_agents(envs, obs):
 
     agents = [
-        A2C(i, osp, asp, num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
+        A2C(i, osp, asp, num_processes=config['num_procs'], num_steps=config['num_steps'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space))
     ]
 
@@ -105,7 +99,7 @@ def train(agents, envs):
                     ]
                 )
 
-            obs, reward, done, infos = envs.step(n_action)      
+            obs, reward, done, infos = envs.step(n_action)  
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
@@ -143,10 +137,10 @@ def train(agents, envs):
         total_seac_value_loss = 0
         for agent in agents:
             loss = agent.update([a.storage for a in agents], config['value_loss_coef'], config['entropy_coef'], config['seac_coef'], config['max_grad_norm'], config['device'])
-            total_policy_loss = loss['policy_loss']
-            total_value_loss = loss['value_loss']
-            total_dist_entropy = loss['dist_entropy']
-            total_importance_sampling = loss['importance_sampling']
+            total_policy_loss += loss['policy_loss']
+            total_value_loss += loss['value_loss']
+            total_dist_entropy += loss['dist_entropy']
+            total_importance_sampling += loss['importance_sampling']
             total_seac_policy_loss += loss['seac_policy_loss']
             total_seac_value_loss += loss['seac_value_loss']
         policy_losses.append(total_policy_loss)
@@ -156,6 +150,12 @@ def train(agents, envs):
         seac_policy_losses.append(total_policy_loss)
         seac_value_losses.append(total_value_loss)
         rewards.append(np.array(reward).sum(axis=1).mean())
+
+        # if j & 100 == 0:
+        #     print("Mean reward: ", np.array(reward).sum(axis=1).mean())
+        #     print("Policy loss: ", total_policy_loss)
+        #     print("Value loss: ", total_value_loss)
+        #     print("Total loss?: ", total_policy_loss + total_value_loss - total_dist_entropy + total_seac_policy_loss + total_seac_value_loss)
         
         for agent in agents:
             agent.storage.after_update()
@@ -173,6 +173,8 @@ def save_results(agents, policy_losses, value_losses, dist_entropies, importance
     save_dir = f"./results/{name}"
     agents_dir = f"{save_dir}/agents/{run_nr}"
     train_logs_dir = f"{save_dir}/train_logs/{run_nr}"
+
+    print(train_logs_dir)
 
     for agent in agents:
         save_at = f'{agents_dir}/agent{agent.agent_id}'
@@ -253,6 +255,12 @@ def evaluate_single_env(env, agents, render=False, animation=False):
         obs, rewards, done, info = env.step(n_actions)
         obs = torch.tensor(obs, dtype=torch.float32)
 
+        print("Actions: ", n_actions)
+        print("Electrical storages:")
+        elec_storage_index = env.observation_names[0].index('electrical_storage_soc')
+        for ob in obs:
+            print(ob[elec_storage_index])
+
         if render and not j % render_freq:
             frame_data = env.render()
             frames.append(frame_data)
@@ -285,7 +293,7 @@ def evaluate_single_env(env, agents, render=False, animation=False):
 
 def main():
 
-    nr_runs = 2
+    nr_runs = 1
 
     if not evaluate:
 
@@ -325,9 +333,9 @@ def main():
 
     else:
 
-        name = "10DiscNoRec2Mil" # name of the model to load
-        render = True
-        animation = True
+        name = "SEAC_2023-11-29_13-48-53" # name of the model to load
+        render = False
+        animation = False
 
         env = make_env(env_name = config['dataset_name'],
                        rank = 1,

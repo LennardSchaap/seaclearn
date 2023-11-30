@@ -42,16 +42,8 @@ def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_di
 
         seed = 777
 
-        #TODO: Mooier maken
-        if evaluate:
-            start_pos = 7759
-            end_pos = 8759
-        elif random_start:
-            np.random.seed(seed + rank)
-            start_pos = np.random.randint(0, 7759) # citylearn challenge data length is 8759, baeda_3dem is shorter (~2000)
-        else:
-            start_pos = 0
-            end_pos = 7759
+        start_pos = 0
+        end_pos = 7759
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
 

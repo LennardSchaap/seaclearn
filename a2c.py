@@ -18,7 +18,7 @@ class A2C:
         agent_id,
         obs_space,
         action_space,
-        lr = 3e-4,
+        lr = 0.001, # WAS 3e-4
         adam_eps = 0.001,
         gamma = 0.99,
         use_gae = False,
@@ -36,7 +36,7 @@ class A2C:
         seac_coef = 1.0,
 
         num_processes = 4,
-        num_steps = 5,
+        num_steps = 20,
 
         device = "cpu"
     ):
