@@ -12,7 +12,7 @@ if not os.path.exists('data/citylearn_challenge_2022_phase_1_normalized_period')
 # load buildings
 buildings = []
 for i in range(1, 6):
-    buildings.append(pd.read_csv('data/citylearn_challenge_2022_phase_1/building_' + str(i) + '.csv'))
+    buildings.append(pd.read_csv('data/citylearn_challenge_2022_phase_1/Building_' + str(i) + '.csv'))
 
 # # apply periodic transformation to Month, Hour, Day Type features
 # for building in buildings:
@@ -34,7 +34,7 @@ for building in buildings:
 
 # save buildings
 for i in range(5):
-    buildings[i].to_csv('data/citylearn_challenge_2022_phase_1_normalized_period/building_' + str(i + 1) + '.csv', index=False)
+    buildings[i].to_csv('data/citylearn_challenge_2022_phase_1_normalized_period/Building_' + str(i + 1) + '.csv', index=False)
 
 # copy remaining files to new folder
 shutil.copy('data/citylearn_challenge_2022_phase_1/carbon_intensity.csv', 'data/citylearn_challenge_2022_phase_1_normalized_period/carbon_intensity.csv')

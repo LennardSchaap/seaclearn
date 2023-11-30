@@ -110,7 +110,11 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
+<<<<<<< HEAD
+    names = ['SEAC_2023-11-29_13-49-34'] # testing
+=======
     # names = ['ContNoRec2Mil', '10DiscNoRec2Mil'] # testing
+>>>>>>> 0875d32ad2499afd6ea89415c207217824bcd90d
 
     smooth_data = True
     window_size = 1000
