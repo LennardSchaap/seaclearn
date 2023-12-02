@@ -29,7 +29,7 @@ config = {
     "use_proper_time_limits": True,
 
     # Training params
-    "entropy_coef": 0.05,
+    "entropy_coef": 1.0,
     "value_loss_coef": 0.1,
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,

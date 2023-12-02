@@ -150,6 +150,8 @@ class A2C:
             ).detach()
             # importance_sampling = 1.0 # This was commented out before
 
+            print("yeah")
+            print(importance_sampling)
             seac_value_loss += (
                 importance_sampling * other_advantage.pow(2)
             ).mean()
