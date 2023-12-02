@@ -18,6 +18,7 @@ class A2C:
         agent_id,
         obs_space,
         action_space,
+        hidden_size = 64,
         lr = 3e-4,
         adam_eps = 0.001,
         gamma = 0.99,
@@ -48,11 +49,11 @@ class A2C:
         
         if discrete_policy:
             self.model = Policy_discrete(
-                obs_space, action_space, base_kwargs={"recurrent": recurrent_policy},
+                obs_space, action_space, hidden_size, base_kwargs={"recurrent": recurrent_policy},
             )
         else:
             self.model = Policy_continuous(
-                obs_space, action_space, base_kwargs={"recurrent": recurrent_policy},
+                obs_space, action_space, hidden_size, base_kwargs={"recurrent": recurrent_policy},
             )
 
         self.storage = RolloutStorage(

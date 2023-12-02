@@ -7,9 +7,8 @@ from distributions import Categorical
 from utils import init
 from gym.spaces.utils import flatdim
 
-
 class Policy_discrete(nn.Module):
-    def __init__(self, obs_space, action_space, base=None, base_kwargs=None):
+    def __init__(self, obs_space, action_space, hidden_size, base=None, base_kwargs=None):
         super(Policy_discrete, self).__init__()
 
         obs_shape = obs_space.shape
@@ -17,10 +16,11 @@ class Policy_discrete(nn.Module):
         if base_kwargs is None:
             base_kwargs = {}
 
-        self.base = MLPBase(obs_shape[0], **base_kwargs)
+        self.base = MLPBase(obs_shape[0], **base_kwargs, hidden_size = hidden_size)
 
         num_outputs = flatdim(action_space)
         self.dist = Categorical(self.base.output_size, num_outputs)
+        self.hidden_size = hidden_size
 
     @property
     def is_recurrent(self):
@@ -156,6 +156,8 @@ class MLPBase(NNBase):
 
         if recurrent:
             num_inputs = hidden_size
+
+        print(hidden_size)
 
         init_ = lambda m: init(
             m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), np.sqrt(2)

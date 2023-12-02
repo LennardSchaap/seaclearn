@@ -18,10 +18,11 @@ config = {
     # Dataset information
     # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
     "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
-    "num_procs": 8,
+    "num_procs": 4,
     "seed": 42,
 
     # RL params
+    "hidden_size" : 512,
     "gamma": 0.99,
     "use_gae": False,
     "gae_lambda": 0.95,
@@ -35,8 +36,8 @@ config = {
     "device": "cpu",
 
     # Environment settings
-    "num_steps": 10000000,
-    "num_env_steps": 2,
+    "num_steps": 2,
+    "num_env_steps": 10000000,
     
     "recurrent_policy": False,
     "discrete_policy": True,
@@ -62,7 +63,7 @@ if not evaluate:
 def init_agents(envs, obs):
 
     agents = [
-        A2C(i, osp, asp, num_processes=config['num_procs'], num_steps=config['num_steps'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
+        A2C(i, osp, asp, hidden_size=config['hidden_size'], num_processes=config['num_procs'], num_steps=config['num_steps'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space))
     ]
 

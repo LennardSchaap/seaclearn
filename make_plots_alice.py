@@ -15,15 +15,15 @@ def plot(names, smooth_data=False, window_size=100):
     for name in names:
 
         fig2, axs2 = plt.subplots(4, 1, figsize=(15, 6))
-        runs = os.listdir('results/'+name+'/train_logs/')
+        runs = os.listdir('/home/s1914839/data1/results/'+name+'/train_logs/')
 
-        rewards = np.array([np.load('results/'+name+'/train_logs/'+str(run)+'/rewards.npy') for run in runs])
-        policy_losses = np.array([np.load('results/'+name+'/train_logs/'+str(run)+'/policyloss.npy') for run in runs])
-        value_losses = np.array([np.load('results/'+name+'/train_logs/'+str(run)+'/valueloss.npy') for run in runs])
-        dist_entropies = np.array([np.load('results/'+name+'/train_logs/'+str(run)+'/distentropy.npy') for run in runs])
+        rewards = np.array([np.load('/home/s1914839/data1/results/'+name+'/train_logs/'+str(run)+'/rewards.npy') for run in runs])
+        policy_losses = np.array([np.load('/home/s1914839/data1/results/'+name+'/train_logs/'+str(run)+'/policyloss.npy') for run in runs])
+        value_losses = np.array([np.load('/home/s1914839/data1/results/'+name+'/train_logs/'+str(run)+'/valueloss.npy') for run in runs])
+        dist_entropies = np.array([np.load('/home/s1914839/data1/results/'+name+'/train_logs/'+str(run)+'/distentropy.npy') for run in runs])
         # importance_samplings = np.array([np.load('results/'+name+'/train_logs/'+str(run)+'/importancesampling.npy') for run in runs])
-        seac_policy_losses = np.array([np.load('results/'+name+'/train_logs/'+str(run)+'/seacpolicyloss.npy') for run in runs])
-        seac_value_losses = np.array([np.load('results/'+name+'/train_logs/'+str(run)+'/seacvalueloss.npy') for run in runs])
+        seac_policy_losses = np.array([np.load('/home/s1914839/data1/results/'+name+'/train_logs/'+str(run)+'/seacpolicyloss.npy') for run in runs])
+        seac_value_losses = np.array([np.load('/home/s1914839/data1/results/'+name+'/train_logs/'+str(run)+'/seacvalueloss.npy') for run in runs])
 
         total_loss = policy_losses \
             + value_loss_coef * value_losses \
@@ -68,8 +68,8 @@ def plot(names, smooth_data=False, window_size=100):
         # axs2[1].set_ylim(0, 1000)
         # axs2[2].set_ylim(-150,150)
         plt.tight_layout()
-        os.makedirs(f'results/{name}/plots', exist_ok=True)
-        plt.savefig(f'results/{name}/plots/plot.png')
+        os.makedirs(f'/home/s1914839/data1/results/{name}/plots', exist_ok=True)
+        plt.savefig(f'/home/s1914839/data1/results/{name}/plots/plot.png')
         plt.close(fig2)
 
         axs[0].plot(mean_rewards, label=name)
@@ -98,7 +98,7 @@ def plot(names, smooth_data=False, window_size=100):
     axs[1].set_ylim(0, 100)
     # axs[2].set_ylim(-300,300)
     plt.tight_layout()
-    plt.savefig('results/all_plots.png')
+    plt.savefig('/home/s1914839/data1/results/all_plots.png')
 
 
 def smooth(data, window_size):
@@ -107,7 +107,7 @@ def smooth(data, window_size):
 
 def main():
 
-    names = os.listdir('results/')
+    names = os.listdir('/home/s1914839/data1/results/')
     names.remove('all_plots.png')
 
     names = ['SEAC_2023-12-01_14-28-43'] # testing
