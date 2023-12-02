@@ -180,8 +180,6 @@ class MLPBase(NNBase):
         if recurrent:
             num_inputs = hidden_size
 
-        print(hidden_size)
-
         init_ = lambda m: init(
             m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), np.sqrt(2)
         )

@@ -83,10 +83,10 @@ def plot(names, smooth_data=False, window_size=100):
 
 
     # plot marlisa results as extra line in the reward plot
-    marlisa_reward = read_marlisa_results()
-    if smooth_data:
-        marlisa_reward = smooth(marlisa_reward, window_size)
-    axs[0].plot(marlisa_reward, color='black', label='MARLISA')
+    # marlisa_reward = read_marlisa_results()
+    # if smooth_data:
+    #     marlisa_reward = smooth(marlisa_reward, window_size)
+    # axs[0].plot(marlisa_reward, color='black', label='MARLISA')
 
     axs[0].legend()
     axs[1].legend()
@@ -101,7 +101,7 @@ def plot(names, smooth_data=False, window_size=100):
     axs[2].set_ylabel('policy loss')
     axs[3].set_ylabel('total loss')
 
-    axs[0].set_ylim(top=0)
+    # axs[0].set_ylim(top=1)
     axs[1].set_ylim(0, 100)
     # axs[2].set_ylim(-300,300)
     
@@ -117,7 +117,7 @@ def smooth(data, window_size):
 def read_marlisa_results():
 
     rewards = []
-    with open('results/marlisa2.log') as f:
+    with open('marlisa2.log') as f:
 
         lines = f.readlines()
 
@@ -138,9 +138,9 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
-    names = ['3DiscNoRec5mil64Hidden', '3DiscNoRec5mil256Hidden', '3DiscNoRec5mil512Hidden'] # testing
+    names = ['3DiscNoRec5mil256Hidden', 'RandomWarmupDiscNoRec2'] # testing
 
-    smooth_data = False
+    smooth_data = True
     window_size = 100
     plot(names, smooth_data, window_size)
 
