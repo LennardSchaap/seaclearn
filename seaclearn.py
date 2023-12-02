@@ -181,7 +181,7 @@ def train(agents, envs):
         for agent in agents:
             agent.storage.after_update()
 
-        if j % 100 == 0:
+        if j % 1 == 0:
             print(f'Update {j}/{num_updates}')
 
     print('Finished training at:', datetime.datetime.now())
