@@ -36,8 +36,8 @@ config = {
     "device": "cpu",
 
     # Environment settings
-    "num_steps": 1000000,
-    "num_env_steps": 2,
+    "num_steps": 2,
+    "num_env_steps": 100000,
     
     "recurrent_policy": False,
     "discrete_policy": True,
@@ -333,7 +333,7 @@ def main():
 
     else:
 
-        name = "SEAC_2023-11-30_23-38-22" # name of the model to load
+        name = "SEAC_2023-12-01_14-28-43" # name of the model to load
         render = False
         animation = False
 
