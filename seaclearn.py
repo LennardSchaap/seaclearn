@@ -27,6 +27,7 @@ config = {
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
+    'random_warmup_steps': 1000,
 
     # Training params
     "entropy_coef": 0.05,
@@ -37,14 +38,14 @@ config = {
 
     # Environment settings
     "num_steps": 2,
-    "num_env_steps": 10000000,
+    "num_env_steps": 100000,
     
     "recurrent_policy": False,
     "discrete_policy": True,
     "default_bin_size": 3, # only used if discrete_policy is True
 }
 
-evaluate = False
+evaluate = True
 
 # Environment wrappers
 wrappers = []
@@ -73,10 +74,18 @@ def init_agents(envs, obs):
 
     return agents
 
+
 # Train agents
 def train(agents, envs):
 
     policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards = [], [], [], [], [], [], []
+
+    n_recurrent_hidden_states = ([
+        torch.zeros(
+            1, agent.model.recurrent_hidden_state_size, device=config['device']
+        )
+        for agent in agents
+    ])
 
     num_updates = (
         int(config['num_env_steps']) // config['num_steps'] // config['num_procs']
@@ -86,20 +95,30 @@ def train(agents, envs):
     for j in range(1, num_updates + 1):
 
         for step in range(config['num_steps']):
-            # Sample actions
-            with torch.no_grad():
-                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
-                    *[
-                        agent.model.act(
-                            agent.storage.obs[step],
-                            agent.storage.recurrent_hidden_states[step],
-                            agent.storage.masks[step],
-                        )
-                        for agent in agents
-                    ]
-                )
 
-            obs, reward, done, infos = envs.step(n_action)  
+            if 1 < j < config['random_warmup_steps']:
+
+                # Sample random actions
+                if config['discrete_policy']:
+                    with torch.no_grad():
+                        n_action = torch.tensor(np.array([[a.sample() for _ in range(config['num_procs'])] for a in envs.action_space]))                        
+                    obs, reward, done, infos = envs.step(n_action)
+
+            else:
+                # Sample actions
+                with torch.no_grad():
+                    n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
+                        *[
+                            agent.model.act(
+                                agent.storage.obs[step],
+                                agent.storage.recurrent_hidden_states[step],
+                                agent.storage.masks[step],
+                            )
+                            for agent in agents
+                        ]
+                    )
+
+                obs, reward, done, infos = envs.step(n_action)  
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
@@ -160,7 +179,7 @@ def train(agents, envs):
         for agent in agents:
             agent.storage.after_update()
 
-        if j % 1000 == 0:
+        if j % 100 == 0:
             print(f'Update {j}/{num_updates}')
 
     print('Finished training at:', datetime.datetime.now())
@@ -216,7 +235,7 @@ def load_agents(envs, name, evaluation = False):
 
     agents = []
     for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space)):
-        agent = A2C(i, osp, asp, num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
+        agent = A2C(i, osp, asp, hidden_size=config['hidden_size'], num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         model_path = f"{save_dir}/agent{i}"
         agent.restore(model_path)
         agents.append(agent)
@@ -333,7 +352,7 @@ def main():
 
     else:
 
-        name = "SEAC_2023-11-29_13-48-53" # name of the model to load
+        name = "RandomWarmupDiscNoRec2" # name of the model to load
         render = False
         animation = False
 
