@@ -30,23 +30,23 @@ config = {
     'random_warmup_steps': 1000,
 
     # Training params
-    "entropy_coef": 10.0,
+    "entropy_coef": 0.01,
     "value_loss_coef": 0.1,
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
 
     # Environment settings
-    "num_steps": 2,
+    "num_steps": 700,
 
-    "num_env_steps": 100000,
+    "num_env_steps": 7000000,
 
     "recurrent_policy": False,
     "discrete_policy": False,
     "default_bin_size": 3, # only used if discrete_policy is True
 }
 
-evaluate = True
+evaluate = False
 
 # Environment wrappers
 wrappers = []
