@@ -9,7 +9,6 @@ from a2c import A2C
 
 import matplotlib
 import matplotlib.pyplot as plt
-
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
@@ -20,7 +19,7 @@ config = {
     # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
     "dataset_name": "/home/s1914839/data1/data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
-    "seed": 33,
+    "seed": 42,
 
     # RL params
     "hidden_size" : 256,
@@ -32,7 +31,7 @@ config = {
 
     # Training params
     "entropy_coef": 0.01,
-    "value_loss_coef": 0.5,
+    "value_loss_coef": 0.1,
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
@@ -75,6 +74,7 @@ def init_agents(envs, obs):
         agents[i].storage.to(config['device'])
 
     return agents
+
 
 # Train agents
 def train(agents, envs):
@@ -181,11 +181,12 @@ def train(agents, envs):
         for agent in agents:
             agent.storage.after_update()
 
-        if j % 100 == 0:
+        if j % 1 == 0:
             print(f'Update {j}/{num_updates}')
 
     print('Finished training at:', datetime.datetime.now())
     return agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards
+
 
 # Save agent models
 def save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name):
@@ -217,7 +218,7 @@ def save_results(agents, policy_losses, value_losses, dist_entropies, importance
 # Save hyperparameters and other settings
 def save_config(config, name):
 
-    save_dir = f"/home/s1914839/data1/results/{name}"
+    save_dir = f"/home/s1914839/data1//results/{name}"
     os.makedirs(save_dir, exist_ok=True)
 
     with open(f'{save_dir}/config.txt', 'w') as f:
@@ -236,7 +237,7 @@ def load_agents(envs, name, evaluation = False):
 
     agents = []
     for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space)):
-        agent = A2C(i, osp, asp, num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
+        agent = A2C(i, osp, asp, hidden_size=config['hidden_size'], num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         model_path = f"{save_dir}/agent{i}"
         agent.restore(model_path)
         agents.append(agent)
@@ -353,7 +354,8 @@ def main():
 
     else:
 
-        name = "SEAC_2023-12-01_14-28-43" # name of the model to load
+        name = "SEAC_2023-12-02_22-26-17" # name of the model to load
+
         render = False
         animation = False
 
