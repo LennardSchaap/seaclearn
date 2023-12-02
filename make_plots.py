@@ -138,7 +138,7 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
-    names = ['3DiscNoRec5mil256Hidden', 'RandomWarmupDiscNoRec2'] # testing
+    names = ['SEAC_2023-12-02_22-26-17'] # testing
 
     smooth_data = True
     window_size = 100

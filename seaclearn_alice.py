@@ -18,33 +18,36 @@ from citylearn.citylearn import EvaluationCondition
 config = {
     # Dataset information
     # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
-    "dataset_name": "/home/s1914839/data1/data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
-    "num_procs": 8,
+    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    "num_procs": 4,
     "seed": 33,
 
     # RL params
+    "hidden_size" : 256,
     "gamma": 0.99,
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
+    'random_warmup_steps': 1000,
 
     # Training params
-    "entropy_coef": 0.05,
-    "value_loss_coef": 0.1,
+    "entropy_coef": 0.01,
+    "value_loss_coef": 0.5,
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
 
     # Environment settings
-    "num_steps": 2,
-    "num_env_steps": 100000,
-    
+    "num_steps": 700,
+
+    "num_env_steps": 7000000,
+
     "recurrent_policy": False,
-    "discrete_policy": True,
+    "discrete_policy": False,
     "default_bin_size": 3, # only used if discrete_policy is True
 }
 
-evaluate = True
+evaluate = False
 
 # Environment wrappers
 wrappers = []
@@ -63,7 +66,7 @@ if not evaluate:
 def init_agents(envs, obs):
 
     agents = [
-        A2C(i, osp, asp, num_processes=config['num_procs'], num_steps=config['num_steps'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
+        A2C(i, osp, asp, hidden_size=config['hidden_size'], num_processes=config['num_procs'], num_steps=config['num_steps'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space))
     ]
 
@@ -78,6 +81,13 @@ def train(agents, envs):
 
     policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards = [], [], [], [], [], [], []
 
+    n_recurrent_hidden_states = ([
+        torch.zeros(
+            1, agent.model.recurrent_hidden_state_size, device=config['device']
+        )
+        for agent in agents
+    ])
+
     num_updates = (
         int(config['num_env_steps']) // config['num_steps'] // config['num_procs']
     )
@@ -86,20 +96,30 @@ def train(agents, envs):
     for j in range(1, num_updates + 1):
 
         for step in range(config['num_steps']):
-            # Sample actions
-            with torch.no_grad():
-                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
-                    *[
-                        agent.model.act(
-                            agent.storage.obs[step],
-                            agent.storage.recurrent_hidden_states[step],
-                            agent.storage.masks[step],
-                        )
-                        for agent in agents
-                    ]
-                )
 
-            obs, reward, done, infos = envs.step(n_action)  
+            if 1 < j < config['random_warmup_steps']:
+
+                # Sample random actions
+                if config['discrete_policy']:
+                    with torch.no_grad():
+                        n_action = torch.tensor(np.array([[a.sample() for _ in range(config['num_procs'])] for a in envs.action_space]))                        
+                    obs, reward, done, infos = envs.step(n_action)
+
+            else:
+                # Sample actions
+                with torch.no_grad():
+                    n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
+                        *[
+                            agent.model.act(
+                                agent.storage.obs[step],
+                                agent.storage.recurrent_hidden_states[step],
+                                agent.storage.masks[step],
+                            )
+                            for agent in agents
+                        ]
+                    )
+
+                obs, reward, done, infos = envs.step(n_action)  
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
@@ -135,6 +155,7 @@ def train(agents, envs):
         total_importance_sampling = 0
         total_seac_policy_loss = 0
         total_seac_value_loss = 0
+
         for agent in agents:
             loss = agent.update([a.storage for a in agents], config['value_loss_coef'], config['entropy_coef'], config['seac_coef'], config['max_grad_norm'], config['device'])
             total_policy_loss += loss['policy_loss']
@@ -151,21 +172,20 @@ def train(agents, envs):
         seac_value_losses.append(total_value_loss)
         rewards.append(np.array(reward).sum(axis=1).mean())
 
-        if j & 100 == 0:
-            print("Mean reward: ", np.array(reward).sum(axis=1).mean())
-            print("Policy loss: ", total_policy_loss)
-            print("Value loss: ", total_value_loss)
-            print("Total loss?: ", total_policy_loss + total_value_loss - total_dist_entropy + total_seac_policy_loss + total_seac_value_loss)
+        # if j & 100 == 0:
+        #     print("Mean reward: ", np.array(reward).sum(axis=1).mean())
+        #     print("Policy loss: ", total_policy_loss)
+        #     print("Value loss: ", total_value_loss)
+        #     print("Total loss?: ", total_policy_loss + total_value_loss - total_dist_entropy + total_seac_policy_loss + total_seac_value_loss)
         
         for agent in agents:
             agent.storage.after_update()
 
-        if j % 1000 == 0:
+        if j % 100 == 0:
             print(f'Update {j}/{num_updates}')
 
     print('Finished training at:', datetime.datetime.now())
     return agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards
-
 
 # Save agent models
 def save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name):
