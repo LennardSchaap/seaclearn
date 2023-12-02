@@ -150,8 +150,6 @@ class A2C:
             ).detach()
             # importance_sampling = 1.0 # This was commented out before
 
-            print("yeah")
-            print(importance_sampling)
             seac_value_loss += (
                 importance_sampling * other_advantage.pow(2)
             ).mean()
@@ -160,6 +158,11 @@ class A2C:
                 -importance_sampling * other_advantage.detach()
             ).mean()
 
+        # print(entropy_coef)
+        # print(dist_entropy)
+        # print(-entropy_coef * dist_entropy)
+
+        # print(policy_loss)
         self.optimizer.zero_grad()
         (
             policy_loss
