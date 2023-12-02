@@ -19,7 +19,7 @@ config = {
     # Dataset information
     # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
     "dataset_name": "/home/s1914839/data1/data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
-    "num_procs": 8,
+    "num_procs": 4,
     "seed": 33,
 
     # RL params
