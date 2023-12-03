@@ -23,7 +23,7 @@ class MADummyVecEnv(DummyVecEnv):
 
 def make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_dir, random_start = False, evaluate = False):
 
-    start_pos = 7759
+    start_pos = 7700
     end_pos = 8759
 
     env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
@@ -43,7 +43,7 @@ def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_di
         seed = 123
 
         start_pos = 0
-        end_pos = 7759
+        end_pos = 7700
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
 

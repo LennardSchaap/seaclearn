@@ -45,13 +45,13 @@ config = {
     "num_env_steps": 2000000,
     
     "recurrent_policy": False,
-    "discrete_policy": True,
+    "discrete_policy": False,
     "default_bin_size": 3, # only used if discrete_policy is True
 
     'normalize_observations': True
 }
 
-evaluate = True
+evaluate = False
 
 # Environment wrappers
 wrappers = []
@@ -169,6 +169,7 @@ def train(agents, envs):
         total_importance_sampling = 0
         total_seac_policy_loss = 0
         total_seac_value_loss = 0
+
         for agent in agents:
             loss = agent.update([a.storage for a in agents], config['value_loss_coef'], config['entropy_coef'], config['seac_coef'], config['max_grad_norm'], config['device'])
             total_policy_loss += loss['policy_loss']
@@ -194,8 +195,8 @@ def train(agents, envs):
         for agent in agents:
             agent.storage.after_update()
 
-        # if j % 100 == 0:
-        print(f'Update {j}/{num_updates}')
+        if j % 1 == 0:
+            print(f'Update {j}/{num_updates}')
 
     print('Finished training at:', datetime.datetime.now())
     return agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards

@@ -158,6 +158,11 @@ class A2C:
                 -importance_sampling * other_advantage.detach()
             ).mean()
 
+        # print(entropy_coef)
+        # print(dist_entropy)
+        # print(-entropy_coef * dist_entropy)
+
+        # print(policy_loss)
         self.optimizer.zero_grad()
         (
             policy_loss
