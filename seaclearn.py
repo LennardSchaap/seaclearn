@@ -20,8 +20,8 @@ from citylearn.citylearn import EvaluationCondition
 
 config = {
     # Dataset information
-    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
-    # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "seed": 42,
 
@@ -42,7 +42,7 @@ config = {
 
     # Environment settings
     "num_steps": 5,
-    "num_env_steps": 2000000,
+    "num_env_steps": 2000,
     
     "recurrent_policy": False,
     "discrete_policy": False,
@@ -51,7 +51,7 @@ config = {
     'normalize_observations': True
 }
 
-evaluate = True
+evaluate = False
 
 # Environment wrappers
 wrappers = []
@@ -151,12 +151,6 @@ def train(agents, envs):
                     masks,
                     bad_masks,
                 )
-
-        print("Actions: ", n_action)
-        print("Electrical storages:")
-        elec_storage_index = envs.observation_names[0].index('electrical_storage_soc')
-        for ob in obs:
-            print(ob[elec_storage_index])
 
         # Compute returns for each agent
         for agent in agents:

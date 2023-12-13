@@ -14,6 +14,52 @@ from citylearn.wrappers import StableBaselines3Wrapper, DiscreteActionWrapper
 from citylearn.citylearn import CityLearnEnv
 from wrappers import TimeLimit, Monitor, DiscreteActionWrapperFix
 
+from typing import Any, List, Mapping, Union
+from citylearn.reward_function import RewardFunction
+
+class CustomReward(RewardFunction):
+    def __init__(self, env: CityLearnEnv):
+        r"""Initialize CustomReward.
+
+        Parameters
+        ----------
+        env: Mapping[str, CityLearnEnv]
+            CityLearn environment instance.
+        """
+
+        super().__init__(env)
+
+    def calculate(self, observations: List[Mapping[str, Union[int, float]]]) -> List[float]:
+        r"""Returns reward for most recent action.
+
+        The reward is designed to minimize electricity cost.
+        It is calculated for each building, i and summed to provide the agent
+        with a reward that is representative of all n buildings.
+        It encourages net-zero energy use by penalizing grid load satisfaction
+        when there is energy in the battery as well as penalizing
+        net export when the battery is not fully charged through the penalty
+        term. There is neither penalty nor reward when the battery
+        is fully charged during net export to the grid. Whereas, when the
+        battery is charged to capacity and there is net import from the
+        grid the penalty is maximized.
+
+        Returns
+        -------
+        reward: List[float]
+            Reward for transition to current timestep.
+        """
+
+        rewards = []
+
+        for o in observations:
+            cost = o['net_electricity_consumption']
+            battery_soc = o['electrical_storage_soc']
+            penalty = -(1.0 + np.sign(cost) * battery_soc)
+            reward = penalty * abs(cost)
+            rewards.append(reward)
+
+        return rewards
+
 class MADummyVecEnv(DummyVecEnv):
     def __init__(self, env_fns):
         super().__init__(env_fns)
@@ -46,6 +92,7 @@ def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_di
         end_pos = 7700
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
+        env.reward_function = CustomReward(env)
 
         if time_limit:
             env = TimeLimit(env, time_limit)
