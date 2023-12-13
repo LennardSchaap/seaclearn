@@ -71,7 +71,6 @@ def plot(names, smooth_data=False, window_size=100):
         os.makedirs(f'/home/s1914839/data1/results/{name}/plots', exist_ok=True)
         plt.savefig(f'/home/s1914839/data1/results/{name}/plots/plot.png')
         plt.close(fig2)
-
         axs[0].plot(mean_rewards, label=name)
         axs[1].plot(mean_value_losses, label=name)
         axs[2].plot(mean_policy_losses, label=name)
@@ -80,6 +79,13 @@ def plot(names, smooth_data=False, window_size=100):
         axs[1].fill_between(range(len(mean_value_losses)), mean_value_losses-std_value_losses, mean_value_losses+std_value_losses, alpha=0.2)
         axs[2].fill_between(range(len(mean_policy_losses)), mean_policy_losses-std_policy_losses, mean_policy_losses+std_policy_losses, alpha=0.2)
         axs[3].fill_between(range(len(mean_total_loss)), mean_total_loss-std_total_loss, mean_total_loss+std_total_loss, alpha=0.2)
+
+
+    # plot marlisa results as extra line in the reward plot
+    marlisa_reward = read_marlisa_results()
+    if smooth_data:
+        marlisa_reward = smooth(marlisa_reward, window_size)
+    axs[0].plot(marlisa_reward[:len(mean_rewards)], color='black', label='MARLISA')
 
     axs[0].legend()
     axs[1].legend()
@@ -94,15 +100,36 @@ def plot(names, smooth_data=False, window_size=100):
     axs[2].set_ylabel('policy loss')
     axs[3].set_ylabel('total loss')
 
-    axs[0].set_ylim(top=0)
-    axs[1].set_ylim(0, 100)
+    # axs[0].set_ylim(top=1)
+    # axs[1].set_ylim(0, 100)
     # axs[2].set_ylim(-300,300)
+    
     plt.tight_layout()
-    plt.savefig('/home/s1914839/data1/results/all_plots.png')
+    plt.show()
+    # plt.savefig('results/all_plots.png', dpi=300)
 
 
 def smooth(data, window_size):
     return np.convolve(data, np.ones(window_size), 'valid') / window_size
+
+
+def read_marlisa_results():
+
+    rewards = []
+    with open('marlisa2.log') as f:
+
+        lines = f.readlines()
+
+        for line in lines:
+            if 'Time step' in line:
+                reward_str = line.split('Rewards: ')[1]
+                reward_str = reward_str.replace('[', '').replace(']', '')
+                reward = np.array([float(reward) for reward in reward_str.split(', ')]).sum()
+                rewards.append(reward)
+
+    rewards = np.array(rewards)
+
+    return rewards
 
 
 def main():
@@ -110,10 +137,10 @@ def main():
     names = os.listdir('/home/s1914839/data1/results/')
     names.remove('all_plots.png')
 
-    names = ['SEAC_2023-12-01_14-28-43'] # testing
+    names = ['SEAC_2023-12-13_16-03-37'] # testing
 
-    smooth_data = True
-    window_size = 1000
+    smooth_data = False
+    window_size = 100
     plot(names, smooth_data, window_size)
 
 

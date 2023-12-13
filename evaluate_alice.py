@@ -55,7 +55,7 @@ def set_active_observations(
 def read_config(name):
 
     config = {}
-    with open(f'results/{name}/config.txt') as f:
+    with open(f'/home/s1914839/data1/results/{name}/config.txt') as f:
         lines = f.readlines()
         for line in lines:
             line = line.split(": ")
@@ -91,7 +91,7 @@ def get_wrappers(config):
 def load_agents(envs, name, config):
 
     run_nr = 0
-    save_dir = f"./results/{name}/agents/{run_nr}"
+    save_dir = f"/home/s1914839/data1//results/{name}/agents/{run_nr}"
 
     agents = []
     for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space)):
@@ -356,13 +356,13 @@ def plot_simulation_summary(envs: Mapping[str, CityLearnEnv]):
 def save_figs(envs, plot_name):
     
     for k, v in envs.items():
-        plt.savefig(f'results/{k}/plots/{plot_name}.png')
+        plt.savefig(f'/home/s1914839/data1/results/{k}/plots/{plot_name}.png')
         plt.close()
 
 
 def main():
 
-    name = "SEAC_2023-12-13_15-56-38" # name of the model to load
+    name = "SEAC_2023-12-13_16-03-37" # name of the model to load
     render = False
     animation = False
 
@@ -370,9 +370,9 @@ def main():
 
     wrappers = get_wrappers(config)
 
-    f = open('data/citylearn_challenge_2022_phase_1/schema.json')
+    f = open('/home/s1914839/data1/data/citylearn_challenge_2022_phase_1/schema.json')
     schema = json.load(f)
-    schema['root_directory'] = './data/citylearn_challenge_2022_phase_1'
+    schema['root_directory'] = '/home/s1914839/data1/data/citylearn_challenge_2022_phase_1'
 
     active_observations = ["month",
                            "day_type",
@@ -405,7 +405,7 @@ def main():
     else:
         title = 'Continuous Actions'
     fig = plot_actions(action_list[:97], title, env, config)
-    plt.savefig(f'results/{name}/plots/actions.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'/home/s1914839/data1/results/{name}/plots/actions.png', dpi=300, bbox_inches='tight')
     print("Actions plot saved.")
 
     print("Plotting KPIs...")
