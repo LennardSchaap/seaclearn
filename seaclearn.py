@@ -4,20 +4,24 @@ import torch
 import os
 import datetime
 
+from typing import List, Mapping, Tuple
+
+from citylearn.citylearn import CityLearnEnv
 from envs import make_env, make_vec_envs
 from a2c import A2C
 
-import matplotlib
+from matplotlib import ticker
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
+import pandas as pd
 
 from citylearn.citylearn import EvaluationCondition
 
 config = {
     # Dataset information
-    # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
-    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "seed": 42,
 
@@ -30,26 +34,30 @@ config = {
     'random_warmup_steps': 1000,
 
     # Training params
-    "entropy_coef": 10.0,
-    "value_loss_coef": 0.01,
+    "entropy_coef": 0.1,
+    "value_loss_coef": 0.1,
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
 
     # Environment settings
-    "num_steps": 700,
-
-    "num_env_steps": 7000000,
-
+    "num_steps": 5,
+    "num_env_steps": 2000000,
+    
     "recurrent_policy": False,
     "discrete_policy": False,
     "default_bin_size": 3, # only used if discrete_policy is True
+
+    'normalize_observations': True
 }
 
 evaluate = True
 
 # Environment wrappers
 wrappers = []
+
+if config['normalize_observations']:
+    wrappers.append(NormalizedObservationWrapper)
 
 if config['discrete_policy'] and not evaluate:
     wrappers.append(DiscreteActionWrapperFix)
@@ -60,6 +68,7 @@ else:
         wrappers.append(FlattenAction)
 if not evaluate:
     wrappers.append(FlattenObservation)
+
 
 # Initialize agents
 def init_agents(envs, obs):
@@ -100,10 +109,9 @@ def train(agents, envs):
             if 1 < j < config['random_warmup_steps']:
 
                 # Sample random actions
-                if config['discrete_policy']:
-                    with torch.no_grad():
-                        n_action = torch.tensor(np.array([[a.sample() for _ in range(config['num_procs'])] for a in envs.action_space]))                        
-                    obs, reward, done, infos = envs.step(n_action)
+                with torch.no_grad():
+                    n_action = torch.tensor(np.array([[a.sample() for _ in range(config['num_procs'])] for a in envs.action_space]))                        
+                obs, reward, done, infos = envs.step(n_action)
 
             else:
                 # Sample actions
@@ -143,6 +151,12 @@ def train(agents, envs):
                     masks,
                     bad_masks,
                 )
+
+        print("Actions: ", n_action)
+        print("Electrical storages:")
+        elec_storage_index = envs.observation_names[0].index('electrical_storage_soc')
+        for ob in obs:
+            print(ob[elec_storage_index])
 
         # Compute returns for each agent
         for agent in agents:
@@ -263,6 +277,7 @@ def evaluate_single_env(env, agents, render=False, animation=False):
     ]
     masks = torch.zeros(evaluation_steps, 1, device=config['device'])
     
+    action_list = []
     frames = []
     for j in range(evaluation_steps):
         
@@ -273,14 +288,19 @@ def evaluate_single_env(env, agents, render=False, animation=False):
                 n_actions.append(n_action)
 
         n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
+        action_list.append(n_actions)
+
         obs, rewards, done, info = env.step(n_actions)
         obs = torch.tensor(obs, dtype=torch.float32)
 
-        # print("Actions: ", n_actions)
         # print("Electrical storages:")
         # elec_storage_index = env.observation_names[0].index('electrical_storage_soc')
         # for ob in obs:
         #     print(ob[elec_storage_index])
+
+        # elec_storage_index = env.observation_names[0].index('electrical_storage_soc')
+        # for ob in obs:
+        #     print('Battery level:', ob[elec_storage_index])
 
         if render and not j % render_freq:
             frame_data = env.render()
@@ -311,6 +331,48 @@ def evaluate_single_env(env, agents, render=False, animation=False):
     print(kpis)
 
     env.close()
+
+    return action_list
+
+
+def plot_actions(actions_list: List[List[float]], title: str, env) -> plt.Figure:
+    """Plots action time series for different buildings
+
+    Parameters
+    ----------
+    actions_list: List[List[float]]
+        List of actions where each element with index, i,
+        in list is a list of the actions for different buildings
+        taken at time step i.
+    title: str
+        Plot axes title
+
+    Returns
+    -------
+    fig: plt.Figure
+        Figure with plotted axes
+
+    """
+
+    fig, ax = plt.subplots(1, 1, figsize=(6, 2))
+    columns = [b.name.replace('_', ' ') for b in env.buildings]
+    plot_data = pd.DataFrame(actions_list, columns=columns)
+    x = list(range(plot_data.shape[0]))
+
+    for c in plot_data.columns:
+        y = plot_data[c].tolist()
+        ax.plot(x, y, label=c)
+
+    ax.set_ylim(-1.1, 1.1)
+    # ax.set_yticks([0, 1, 2])
+    ax.legend(loc='upper left', bbox_to_anchor=(1.0, 1.0), framealpha=0.0)
+    ax.set_xlabel('Time step')
+    ax.set_ylabel(r'Action $a_t$')
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(24))
+    ax.set_title(title)
+
+    return fig
+
 
 def main():
 
@@ -354,8 +416,7 @@ def main():
 
     else:
 
-        name = "SEAC_2023-12-02_22-36-16" # name of the model to load
-
+        name = "NormalizedMoreExploration" # name of the model to load
         render = False
         animation = False
 
@@ -372,7 +433,12 @@ def main():
         print("Agents loaded!")
 
         print("Evaluating...")
-        evaluate_single_env(env, agents, render=render, animation=animation)
+        action_list = evaluate_single_env(env, agents, render=render, animation=animation)
+
+        fig = plot_actions(action_list[:97], 'Continuous Actions', env)
+        plt.savefig('actions.png', dpi=300, bbox_inches='tight')
+
+
 
 if __name__ == '__main__':
     main()
