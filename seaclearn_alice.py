@@ -310,7 +310,7 @@ def main():
 
     f = open('/home/s1914839/data1/data/citylearn_challenge_2022_phase_1/schema.json')
     schema = json.load(f)
-    schema['root_directory'] = '/home/s1914839/data1/data/citylearn_challenge_2022_phase_'
+    schema['root_directory'] = '/home/s1914839/data1/data/citylearn_challenge_2022_phase_1'
 
     active_observations = ["month",
                            "day_type",
