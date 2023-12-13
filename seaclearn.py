@@ -3,6 +3,7 @@ from citylearn.wrappers import NormalizedObservationWrapper, DiscreteActionWrapp
 import torch
 import os
 import datetime
+import json
 
 from typing import List, Mapping, Tuple
 
@@ -21,7 +22,7 @@ from citylearn.data import DataSet
 
 config = {
     # Dataset information
-    "dataset_name": "citylearn_challenge_2022_phase_1",
+    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
     # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "seed": 42,
@@ -291,7 +292,9 @@ def main():
     print(f"Training new agent: {name}")
     save_config(config, name)
 
-    schema = DataSet.get_schema(config['dataset_name'])
+    f = open('data/citylearn_challenge_2022_phase_1/schema.json')
+    schema = json.load(f)
+    schema['root_directory'] = '/home/wortel/Documents/seaclearn/data/citylearn_challenge_2022_phase_1'
 
     active_observations = ["month",
                            "day_type",
@@ -302,7 +305,7 @@ def main():
                            "electricity_pricing"]
 
     schema = set_active_observations(schema, active_observations)
-    
+
     for run_nr in range(nr_runs):
         
         print("Starting run number:", run_nr)
