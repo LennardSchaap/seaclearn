@@ -94,7 +94,7 @@ def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_di
         end_pos = 7700
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
-        env.reward_function = CustomReward(env)
+        # env.reward_function = CustomReward(env)
 
         if time_limit:
             env = TimeLimit(env, time_limit)
