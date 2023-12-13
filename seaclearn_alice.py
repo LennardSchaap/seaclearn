@@ -22,7 +22,7 @@ from citylearn.data import DataSet
 
 config = {
     # Dataset information
-    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    "dataset_name": "/home/s1914839/data1/data/citylearn_challenge_2022_phase_1/schema.json",
     # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "seed": 42,
@@ -46,7 +46,7 @@ config = {
     "custom_reward": True,
 
     # Environment settings
-    "num_steps": 24,
+    "num_steps": 100,
     "num_env_steps": 100000,
     
     "recurrent_policy": False,
@@ -246,7 +246,7 @@ def train(agents, envs):
 # Save agent models
 def save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name):
 
-    save_dir = f"./results/{name}"
+    save_dir = f"/home/s1914839/data1/results/{name}"
     agents_dir = f"{save_dir}/agents/{run_nr}"
     train_logs_dir = f"{save_dir}/train_logs/{run_nr}"
 
@@ -273,7 +273,7 @@ def save_results(agents, policy_losses, value_losses, dist_entropies, importance
 # Save hyperparameters and other settings
 def save_config(config, name):
 
-    save_dir = f"./results/{name}"
+    save_dir = f"/home/s1914839/data1/results/{name}"
     os.makedirs(save_dir, exist_ok=True)
 
     with open(f'{save_dir}/config.txt', 'w') as f:
@@ -285,7 +285,7 @@ def load_agents(envs, name, evaluation = False):
 
     n = 1
     run_nr = 0
-    save_dir = f"./results/{name}/agents/{run_nr}"
+    save_dir = f"/home/s1914839/data1/results/{name}/agents/{run_nr}"
 
     if not evaluation:
         n = config['num_procs']
@@ -308,9 +308,9 @@ def main():
     print(f"Training new agent: {name}")
     save_config(config, name)
 
-    f = open('data/citylearn_challenge_2022_phase_1/schema.json')
+    f = open('/home/s1914839/data1/data/citylearn_challenge_2022_phase_1/schema.json')
     schema = json.load(f)
-    schema['root_directory'] = './data/citylearn_challenge_2022_phase_1'
+    schema['root_directory'] = '/home/s1914839/data1/data/citylearn_challenge_2022_phase_'
 
     active_observations = ["month",
                            "day_type",
