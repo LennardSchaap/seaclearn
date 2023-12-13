@@ -33,7 +33,8 @@ config = {
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
-    'random_warmup_steps': 0,
+    'random_warmup_steps': 1000,
+    'reward_scale': 5,
 
     # Training params
     "entropy_coef": 0.1,
@@ -120,7 +121,7 @@ def init_agents(envs, obs):
 # Train agents
 def train(agents, envs):
 
-    policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards = [], [], [], [], [], [], []
+    policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, rewards_warmup = [], [], [], [], [], [], [], []
 
     n_recurrent_hidden_states = ([
         torch.zeros(
@@ -132,6 +133,7 @@ def train(agents, envs):
     num_updates = (
         int(config['num_env_steps']) // config['num_steps'] // config['num_procs']
     )
+
     # print current time
     print('Started training at:', datetime.datetime.now())
     for j in range(1, num_updates + 1):
@@ -145,7 +147,14 @@ def train(agents, envs):
                     n_action = torch.tensor(np.array([[a.sample() for _ in range(config['num_procs'])] for a in envs.action_space]))                        
                 obs, reward, done, infos = envs.step(n_action)
 
+                rewards_warmup.append(np.array(reward).sum(axis=1))
+
+                if j == config['random_warmup_steps'] - 1:
+
+                    mean_reward = np.array(rewards_warmup).mean() 
+                    std_reward = np.array(rewards_warmup).std()
             else:
+
                 # Sample actions
                 with torch.no_grad():
                     n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
@@ -159,7 +168,12 @@ def train(agents, envs):
                         ]
                     )
 
-                obs, reward, done, infos = envs.step(n_action)  
+                obs, reward, done, infos = envs.step(n_action)
+                
+                if j > config['random_warmup_steps'] and config['random_warmup_steps'] != 0:
+                    
+                    reward = (reward - mean_reward) / std_reward # normalize reward
+                    reward *= config['reward_scale'] # scale reward
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
