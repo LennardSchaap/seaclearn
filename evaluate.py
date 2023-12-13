@@ -3,6 +3,7 @@ from wrappers import FlattenObservation, FlattenAction, DiscreteActionWrapperFix
 from citylearn.wrappers import NormalizedObservationWrapper, DiscreteActionWrapper
 from a2c import A2C
 import torch
+import json
 from matplotlib import ticker
 import matplotlib.pyplot as plt
 import matplotlib
@@ -16,6 +17,40 @@ import seaborn as sns
 import math
 from citylearn.citylearn import CityLearnEnv
 
+def set_active_observations(
+    schema: dict, active_observations: List[str]
+) -> dict:
+    """Set the observations that will be part of the environment's
+    observation space that is provided to the control agent.
+
+    Parameters
+    ----------
+    schema: dict
+        CityLearn dataset mapping used to construct environment.
+    active_observations: List[str]
+        Names of observations to set active to be passed to control agent.
+
+    Returns
+    -------
+    schema: dict
+        CityLearn dataset mapping with active observations set.
+    """
+
+    active_count = 0
+
+    for o in schema['observations']:
+        if o in active_observations:
+            schema['observations'][o]['active'] = True
+            active_count += 1
+        else:
+            schema['observations'][o]['active'] = False
+
+    valid_observations = list(schema['observations'].keys())
+    assert active_count == len(active_observations),\
+        'the provided observations are not all valid observations.'\
+          f' Valid observations in CityLearn are: {valid_observations}'
+
+    return schema
 
 def read_config(name):
 
@@ -327,7 +362,7 @@ def save_figs(envs, plot_name):
 
 def main():
 
-    name = "SEAC_2023-12-13_12-14-49" # name of the model to load
+    name = "SEAC_2023-12-13_13-22-04" # name of the model to load
     render = False
     animation = False
 
@@ -335,7 +370,21 @@ def main():
 
     wrappers = get_wrappers(config)
 
-    env = make_env(env_name = config['dataset_name'],
+    f = open('data/citylearn_challenge_2022_phase_1/schema.json')
+    schema = json.load(f)
+    schema['root_directory'] = './data/citylearn_challenge_2022_phase_1'
+
+    active_observations = ["month",
+                           "day_type",
+                           "hour",
+                           "solar_generation",
+                           "electrical_storage_soc",
+                           "net_electricity_consumption",
+                           "electricity_pricing"]
+
+    schema = set_active_observations(schema, active_observations)
+
+    env = make_env(env_name = schema,
                     rank = 1,
                     time_limit=None,
                     wrappers = wrappers,

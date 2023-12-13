@@ -294,7 +294,7 @@ def main():
 
     f = open('data/citylearn_challenge_2022_phase_1/schema.json')
     schema = json.load(f)
-    schema['root_directory'] = '/home/wortel/Documents/seaclearn/data/citylearn_challenge_2022_phase_1'
+    schema['root_directory'] = './data/citylearn_challenge_2022_phase_1'
 
     active_observations = ["month",
                            "day_type",
