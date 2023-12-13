@@ -71,7 +71,6 @@ def plot(names, smooth_data=False, window_size=100):
         os.makedirs(f'results/{name}/plots', exist_ok=True)
         plt.savefig(f'results/{name}/plots/plot.png')
         plt.close(fig2)
-
         axs[0].plot(mean_rewards, label=name)
         axs[1].plot(mean_value_losses, label=name)
         axs[2].plot(mean_policy_losses, label=name)
@@ -83,10 +82,10 @@ def plot(names, smooth_data=False, window_size=100):
 
 
     # plot marlisa results as extra line in the reward plot
-    # marlisa_reward = read_marlisa_results()
-    # if smooth_data:
-    #     marlisa_reward = smooth(marlisa_reward, window_size)
-    # axs[0].plot(marlisa_reward, color='black', label='MARLISA')
+    marlisa_reward = read_marlisa_results()
+    if smooth_data:
+        marlisa_reward = smooth(marlisa_reward, window_size)
+    axs[0].plot(marlisa_reward[:len(mean_rewards)], color='black', label='MARLISA')
 
     axs[0].legend()
     axs[1].legend()
@@ -106,8 +105,8 @@ def plot(names, smooth_data=False, window_size=100):
     # axs[2].set_ylim(-300,300)
     
     plt.tight_layout()
-    plt.show()
-    plt.savefig('results/all_plots.png')
+    # plt.show()
+    plt.savefig('results/all_plots.png', dpi=300)
 
 
 def smooth(data, window_size):
@@ -138,7 +137,7 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
-    names = ['SEAC_2023-12-02_22-36-16'] # testing
+    names = ['Continuous SEAC', 'Discrete SEAC'] # testing
 
     smooth_data = True
     window_size = 100
