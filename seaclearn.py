@@ -17,11 +17,12 @@ import numpy as np
 import pandas as pd
 
 from citylearn.citylearn import EvaluationCondition
+from citylearn.data import DataSet
 
 config = {
     # Dataset information
-    # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
-    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    "dataset_name": "citylearn_challenge_2022_phase_1",
+    # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "seed": 42,
 
@@ -31,7 +32,7 @@ config = {
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
-    'random_warmup_steps': 1000,
+    'random_warmup_steps': 0,
 
     # Training params
     "entropy_coef": 0.1,
@@ -42,7 +43,7 @@ config = {
 
     # Environment settings
     "num_steps": 5,
-    "num_env_steps": 2000,
+    "num_env_steps": 100000,
     
     "recurrent_policy": False,
     "discrete_policy": False,
@@ -51,24 +52,55 @@ config = {
     'normalize_observations': True
 }
 
-evaluate = False
-
 # Environment wrappers
 wrappers = []
 
 if config['normalize_observations']:
     wrappers.append(NormalizedObservationWrapper)
 
-if config['discrete_policy'] and not evaluate:
+if config['discrete_policy']:
     wrappers.append(DiscreteActionWrapperFix)
-elif config['discrete_policy'] and evaluate:
+elif config['discrete_policy']:
     wrappers.append(DiscreteActionWrapper)
 else:
-    if not evaluate:
-        wrappers.append(FlattenAction)
-if not evaluate:
-    wrappers.append(FlattenObservation)
+    wrappers.append(FlattenAction)
 
+wrappers.append(FlattenObservation)
+
+def set_active_observations(
+    schema: dict, active_observations: List[str]
+) -> dict:
+    """Set the observations that will be part of the environment's
+    observation space that is provided to the control agent.
+
+    Parameters
+    ----------
+    schema: dict
+        CityLearn dataset mapping used to construct environment.
+    active_observations: List[str]
+        Names of observations to set active to be passed to control agent.
+
+    Returns
+    -------
+    schema: dict
+        CityLearn dataset mapping with active observations set.
+    """
+
+    active_count = 0
+
+    for o in schema['observations']:
+        if o in active_observations:
+            schema['observations'][o]['active'] = True
+            active_count += 1
+        else:
+            schema['observations'][o]['active'] = False
+
+    valid_observations = list(schema['observations'].keys())
+    assert active_count == len(active_observations),\
+        'the provided observations are not all valid observations.'\
+          f' Valid observations in CityLearn are: {valid_observations}'
+
+    return schema
 
 # Initialize agents
 def init_agents(envs, obs):
@@ -83,7 +115,6 @@ def init_agents(envs, obs):
         agents[i].storage.to(config['device'])
 
     return agents
-
 
 # Train agents
 def train(agents, envs):
@@ -195,7 +226,6 @@ def train(agents, envs):
     print('Finished training at:', datetime.datetime.now())
     return agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards
 
-
 # Save agent models
 def save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name):
 
@@ -252,187 +282,55 @@ def load_agents(envs, name, evaluation = False):
 
     return agents
 
-# Evaluate function without vectorized envs
-def evaluate_single_env(env, agents, render=False, animation=False):
-    
-    # Evaluation settings
-    evaluation_steps = 1000
-    render_freq = 10
-
-    obs = env.reset()
-    obs = torch.tensor(obs, dtype=torch.float32)
-    
-    # Initialize recurrent hidden states and masks for recurrent policies
-    n_recurrent_hidden_states = [
-        torch.zeros(
-            evaluation_steps, agent.model.recurrent_hidden_state_size, device=config['device']
-        )
-        for agent in agents
-    ]
-    masks = torch.zeros(evaluation_steps, 1, device=config['device'])
-    
-    action_list = []
-    frames = []
-    for j in range(evaluation_steps):
-        
-        n_actions = []
-        for i, agent in enumerate(agents):
-            with torch.no_grad():
-                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks, deterministic=True)
-                n_actions.append(n_action)
-
-        n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
-        action_list.append(n_actions)
-
-        obs, rewards, done, info = env.step(n_actions)
-        obs = torch.tensor(obs, dtype=torch.float32)
-
-        # print("Electrical storages:")
-        # elec_storage_index = env.observation_names[0].index('electrical_storage_soc')
-        # for ob in obs:
-        #     print(ob[elec_storage_index])
-
-        # elec_storage_index = env.observation_names[0].index('electrical_storage_soc')
-        # for ob in obs:
-        #     print('Battery level:', ob[elec_storage_index])
-
-        if render and not j % render_freq:
-            frame_data = env.render()
-            frames.append(frame_data)
-
-    print("Done evaluating.")
-
-    if render:
-        for frame_data in frames:
-            plt.imshow(frame_data)
-            plt.pause(0.01)
-            plt.draw()
-        plt.show()
-
-    if animation:
-        print("Creating animation...")
-        fig, ax = plt.subplots()
-        ax.axis('off')
-        anim = FuncAnimation(fig, lambda x: plt.imshow(frames[x], animated=True), frames=len(frames), blit=False)
-        anim.save("evaluation.mp4", writer="ffmpeg")
-        plt.show()
-        print("Animation created.")
-
-    # Evaluate agents and generate cost function values
-    kpis = env.evaluate(baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV)
-    kpis = kpis.pivot(index='cost_function', columns='name', values='value')
-    kpis = kpis.dropna(how='all')
-    print(kpis)
-
-    env.close()
-
-    return action_list
-
-
-def plot_actions(actions_list: List[List[float]], title: str, env) -> plt.Figure:
-    """Plots action time series for different buildings
-
-    Parameters
-    ----------
-    actions_list: List[List[float]]
-        List of actions where each element with index, i,
-        in list is a list of the actions for different buildings
-        taken at time step i.
-    title: str
-        Plot axes title
-
-    Returns
-    -------
-    fig: plt.Figure
-        Figure with plotted axes
-
-    """
-
-    fig, ax = plt.subplots(1, 1, figsize=(6, 2))
-    columns = [b.name.replace('_', ' ') for b in env.buildings]
-    plot_data = pd.DataFrame(actions_list, columns=columns)
-    x = list(range(plot_data.shape[0]))
-
-    for c in plot_data.columns:
-        y = plot_data[c].tolist()
-        ax.plot(x, y, label=c)
-
-    ax.set_ylim(-1.1, 1.1)
-    # ax.set_yticks([0, 1, 2])
-    ax.legend(loc='upper left', bbox_to_anchor=(1.0, 1.0), framealpha=0.0)
-    ax.set_xlabel('Time step')
-    ax.set_ylabel(r'Action $a_t$')
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(24))
-    ax.set_title(title)
-
-    return fig
-
-
 def main():
 
     nr_runs = 1
 
-    if not evaluate:
+    now = datetime.datetime.now()
+    name = "SEAC_" + now.strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"Training new agent: {name}")
+    save_config(config, name)
 
-        now = datetime.datetime.now()
-        name = "SEAC_" + now.strftime("%Y-%m-%d_%H-%M-%S")
-        print(f"Training new agent: {name}")
-        save_config(config, name)
+    schema = DataSet.get_schema(config['dataset_name'])
 
-        for run_nr in range(nr_runs):
-            
-            print("Starting run number:", run_nr)
+    active_observations = ["month",
+                           "day_type",
+                           "hour",
+                           "solar_generation",
+                           "electrical_storage_soc",
+                           "net_electricity_consumption",
+                           "electricity_pricing"]
 
-            # Make vectorized envs
-            torch.set_num_threads(1)
-            envs = make_vec_envs(env_name=config['dataset_name'],
-                                parallel=config['num_procs'],
-                                time_limit=None, # time_limit=time_limit,
-                                wrappers=wrappers,
-                                default_bin_size=config['default_bin_size'],
-                                device=config['device'],
-                                monitor_dir=None
-                                )
+    schema = set_active_observations(schema, active_observations)
+    
+    for run_nr in range(nr_runs):
+        
+        print("Starting run number:", run_nr)
 
-            obs = envs.reset()
+        # Make vectorized envs
+        torch.set_num_threads(1)
+        envs = make_vec_envs(env_name=schema,
+                            parallel=config['num_procs'],
+                            time_limit=None, # time_limit=time_limit,
+                            wrappers=wrappers,
+                            default_bin_size=config['default_bin_size'],
+                            device=config['device'],
+                            monitor_dir=None
+                            )
 
-            # Initialize agents
-            agents = init_agents(envs, obs)
+        obs = envs.reset()
 
-            # Train models
-            agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards = train(agents, envs)
+        # Initialize agents
+        agents = init_agents(envs, obs)
 
-            # Save trained models
-            save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name)
-            print("Saved agent.")
+        # Train models
+        agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards = train(agents, envs)
 
-            envs.close()
+        # Save trained models
+        save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name)
+        print("Saved agent.")
 
-    else:
-
-        name = "NormalizedMoreExploration" # name of the model to load
-        render = False
-        animation = False
-
-        env = make_env(env_name = config['dataset_name'],
-                       rank = 1,
-                       time_limit=None,
-                       wrappers = wrappers,
-                       default_bin_size=config['default_bin_size'],
-                       monitor_dir = None
-                       )
-
-        print("Loading agents...")
-        agents = load_agents(env, name, evaluation = True)
-        print("Agents loaded!")
-
-        print("Evaluating...")
-        action_list = evaluate_single_env(env, agents, render=render, animation=animation)
-
-        fig = plot_actions(action_list[:97], 'Continuous Actions', env)
-        plt.savefig('actions.png', dpi=300, bbox_inches='tight')
-
-
+        envs.close()
 
 if __name__ == '__main__':
     main()

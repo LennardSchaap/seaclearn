@@ -105,8 +105,8 @@ def plot(names, smooth_data=False, window_size=100):
     # axs[2].set_ylim(-300,300)
     
     plt.tight_layout()
-    # plt.show()
-    plt.savefig('results/all_plots.png', dpi=300)
+    plt.show()
+    # plt.savefig('results/all_plots.png', dpi=300)
 
 
 def smooth(data, window_size):
@@ -137,9 +137,9 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
-    names = ['Continuous SEAC', 'Discrete SEAC'] # testing
+    names = ['SEAC_2023-12-13_12-14-49'] # testing
 
-    smooth_data = True
+    smooth_data = False
     window_size = 100
     plot(names, smooth_data, window_size)
 

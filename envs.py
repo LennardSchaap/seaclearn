@@ -60,6 +60,41 @@ class CustomReward(RewardFunction):
 
         return rewards
 
+def set_active_observations(
+    schema: dict, active_observations: List[str]
+) -> dict:
+    """Set the observations that will be part of the environment's
+    observation space that is provided to the control agent.
+
+    Parameters
+    ----------
+    schema: dict
+        CityLearn dataset mapping used to construct environment.
+    active_observations: List[str]
+        Names of observations to set active to be passed to control agent.
+
+    Returns
+    -------
+    schema: dict
+        CityLearn dataset mapping with active observations set.
+    """
+
+    active_count = 0
+
+    for o in schema['observations']:
+        if o in active_observations:
+            schema['observations'][o]['active'] = True
+            active_count += 1
+        else:
+            schema['observations'][o]['active'] = False
+
+    valid_observations = list(schema['observations'].keys())
+    assert active_count == len(active_observations),\
+        'the provided observations are not all valid observations.'\
+          f' Valid observations in CityLearn are: {valid_observations}'
+
+    return schema
+
 class MADummyVecEnv(DummyVecEnv):
     def __init__(self, env_fns):
         super().__init__(env_fns)
