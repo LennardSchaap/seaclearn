@@ -102,7 +102,7 @@ def plot(names, smooth_data=False, window_size=100):
     axs[3].set_ylabel('total loss')
 
     # axs[0].set_ylim(top=1)
-    axs[1].set_ylim(0, 100)
+    # axs[1].set_ylim(0, 100)
     # axs[2].set_ylim(-300,300)
     
     plt.tight_layout()
@@ -138,7 +138,7 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
-    names = ['SEAC_2023-12-02_22-26-17'] # testing
+    names = ['SEAC_2023-12-02_22-36-16'] # testing
 
     smooth_data = True
     window_size = 100

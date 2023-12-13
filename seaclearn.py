@@ -30,8 +30,8 @@ config = {
     'random_warmup_steps': 1000,
 
     # Training params
-    "entropy_coef": 0.01,
-    "value_loss_coef": 0.1,
+    "entropy_coef": 10.0,
+    "value_loss_coef": 0.01,
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
@@ -46,7 +46,7 @@ config = {
     "default_bin_size": 3, # only used if discrete_policy is True
 }
 
-evaluate = False
+evaluate = True
 
 # Environment wrappers
 wrappers = []
@@ -276,11 +276,11 @@ def evaluate_single_env(env, agents, render=False, animation=False):
         obs, rewards, done, info = env.step(n_actions)
         obs = torch.tensor(obs, dtype=torch.float32)
 
-        print("Actions: ", n_actions)
-        print("Electrical storages:")
-        elec_storage_index = env.observation_names[0].index('electrical_storage_soc')
-        for ob in obs:
-            print(ob[elec_storage_index])
+        # print("Actions: ", n_actions)
+        # print("Electrical storages:")
+        # elec_storage_index = env.observation_names[0].index('electrical_storage_soc')
+        # for ob in obs:
+        #     print(ob[elec_storage_index])
 
         if render and not j % render_freq:
             frame_data = env.render()
@@ -354,7 +354,7 @@ def main():
 
     else:
 
-        name = "SEAC_2023-12-02_22-26-17" # name of the model to load
+        name = "SEAC_2023-12-02_22-36-16" # name of the model to load
 
         render = False
         animation = False
