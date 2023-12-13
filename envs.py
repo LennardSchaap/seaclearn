@@ -17,6 +17,11 @@ from wrappers import TimeLimit, Monitor, DiscreteActionWrapperFix
 from typing import Any, List, Mapping, Union
 from citylearn.reward_function import RewardFunction
 
+def scale_and_clip_rewards(rewards, scale_factor=1.0):
+    scaled_rewards = [reward * scale_factor for reward in rewards]
+    clipped_rewards = [max(-1, min(reward, 1)) for reward in scaled_rewards]
+    return clipped_rewards
+
 class CustomReward(RewardFunction):
     def __init__(self, env: CityLearnEnv):
         r"""Initialize CustomReward.
@@ -28,6 +33,8 @@ class CustomReward(RewardFunction):
         """
 
         super().__init__(env)
+
+
 
     def calculate(self, observations: List[Mapping[str, Union[int, float]]]) -> List[float]:
         r"""Returns reward for most recent action.
@@ -59,8 +66,6 @@ class CustomReward(RewardFunction):
             rewards.append(reward)
 
         return rewards
-
-
 
 class MADummyVecEnv(DummyVecEnv):
     def __init__(self, env_fns):

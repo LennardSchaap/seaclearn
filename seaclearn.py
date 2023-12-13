@@ -28,8 +28,9 @@ config = {
     "seed": 42,
 
     # RL params
+    'lr' : 5e-5,
     "hidden_size" : 256,
-    "gamma": 0.99,
+    "gamma": 0.9, #was 0.99
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
@@ -43,7 +44,7 @@ config = {
     "device": "cpu",
 
     # Environment settings
-    "num_steps": 5,
+    "num_steps": 24,
     "num_env_steps": 100000,
     
     "recurrent_policy": False,
@@ -107,7 +108,7 @@ def set_active_observations(
 def init_agents(envs, obs):
 
     agents = [
-        A2C(i, osp, asp, hidden_size=config['hidden_size'], num_processes=config['num_procs'], num_steps=config['num_steps'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
+        A2C(i, osp, asp, lr=config['lr'], hidden_size=config['hidden_size'], num_processes=config['num_procs'], num_steps=config['num_steps'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space))
     ]
 
@@ -276,7 +277,7 @@ def load_agents(envs, name, evaluation = False):
 
     agents = []
     for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space)):
-        agent = A2C(i, osp, asp, hidden_size=config['hidden_size'], num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
+        agent = A2C(i, osp, asp, lr=config['lr'], hidden_size=config['hidden_size'], num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         model_path = f"{save_dir}/agent{i}"
         agent.restore(model_path)
         agents.append(agent)
