@@ -22,7 +22,7 @@ from citylearn.data import DataSet
 
 config = {
     # Dataset information
-    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    "dataset_name": "/home/s1914839/data1/data/citylearn_challenge_2022_phase_1/schema.json",
     # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "seed": 42,
@@ -34,7 +34,8 @@ config = {
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
-    'random_warmup_steps': 0,
+    'random_warmup_steps': 1000,
+    'reward_scale': 5,
 
     # Training params
     "entropy_coef": 0.1,
@@ -42,9 +43,10 @@ config = {
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
+    "custom_reward": True,
 
     # Environment settings
-    "num_steps": 48,
+    "num_steps": 100,
     "num_env_steps": 100000,
     
     "recurrent_policy": False,
@@ -121,7 +123,7 @@ def init_agents(envs, obs):
 # Train agents
 def train(agents, envs):
 
-    policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards = [], [], [], [], [], [], []
+    policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, rewards_warmup = [], [], [], [], [], [], [], []
 
     n_recurrent_hidden_states = ([
         torch.zeros(
@@ -133,6 +135,7 @@ def train(agents, envs):
     num_updates = (
         int(config['num_env_steps']) // config['num_steps'] // config['num_procs']
     )
+
     # print current time
     print('Started training at:', datetime.datetime.now())
     for j in range(1, num_updates + 1):
@@ -146,7 +149,14 @@ def train(agents, envs):
                     n_action = torch.tensor(np.array([[a.sample() for _ in range(config['num_procs'])] for a in envs.action_space]))                        
                 obs, reward, done, infos = envs.step(n_action)
 
+                rewards_warmup.append(np.array(reward).sum(axis=1))
+
+                if j == config['random_warmup_steps'] - 1:
+
+                    mean_reward = np.array(rewards_warmup).mean() 
+                    std_reward = np.array(rewards_warmup).std()
             else:
+
                 # Sample actions
                 with torch.no_grad():
                     n_value, n_action, n_action_log_prob, n_recurrent_hidden_states = zip(
@@ -160,7 +170,12 @@ def train(agents, envs):
                         ]
                     )
 
-                obs, reward, done, infos = envs.step(n_action)  
+                obs, reward, done, infos = envs.step(n_action)
+                
+                if j > config['random_warmup_steps'] and config['random_warmup_steps'] != 0:
+                    
+                    reward = (reward - mean_reward) / std_reward # normalize reward
+                    reward *= config['reward_scale'] # scale reward
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
@@ -231,7 +246,7 @@ def train(agents, envs):
 # Save agent models
 def save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name):
 
-    save_dir = f"./results/{name}"
+    save_dir = f"/home/s1914839/data1/results/{name}"
     agents_dir = f"{save_dir}/agents/{run_nr}"
     train_logs_dir = f"{save_dir}/train_logs/{run_nr}"
 
@@ -258,7 +273,7 @@ def save_results(agents, policy_losses, value_losses, dist_entropies, importance
 # Save hyperparameters and other settings
 def save_config(config, name):
 
-    save_dir = f"./results/{name}"
+    save_dir = f"/home/s1914839/data1/results/{name}"
     os.makedirs(save_dir, exist_ok=True)
 
     with open(f'{save_dir}/config.txt', 'w') as f:
@@ -270,7 +285,7 @@ def load_agents(envs, name, evaluation = False):
 
     n = 1
     run_nr = 0
-    save_dir = f"./results/{name}/agents/{run_nr}"
+    save_dir = f"/home/s1914839/data1/results/{name}/agents/{run_nr}"
 
     if not evaluation:
         n = config['num_procs']
@@ -293,9 +308,9 @@ def main():
     print(f"Training new agent: {name}")
     save_config(config, name)
 
-    f = open('data/citylearn_challenge_2022_phase_1/schema.json')
+    f = open('/home/s1914839/data1/data/citylearn_challenge_2022_phase_1/schema.json')
     schema = json.load(f)
-    schema['root_directory'] = './data/citylearn_challenge_2022_phase_1'
+    schema['root_directory'] = '/home/s1914839/data1/data/citylearn_challenge_2022_phase_'
 
     active_observations = ["month",
                            "day_type",
@@ -319,7 +334,8 @@ def main():
                             wrappers=wrappers,
                             default_bin_size=config['default_bin_size'],
                             device=config['device'],
-                            monitor_dir=None
+                            monitor_dir=None,
+                            custom_reward=config['custom_reward']
                             )
 
         obs = envs.reset()

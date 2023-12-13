@@ -46,7 +46,7 @@ config = {
     "custom_reward": True,
 
     # Environment settings
-    "num_steps": 24,
+    "num_steps": 100,
     "num_env_steps": 100000,
     
     "recurrent_policy": False,
