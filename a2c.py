@@ -30,7 +30,7 @@ class A2C:
 
         use_proper_time_limits = True,
         recurrent_policy = False,
-        use_linear_lr_decay = False,
+        use_linear_lr_decay = True,
         discrete_policy = True,
         default_bin_size = 3,
 
@@ -46,7 +46,7 @@ class A2C:
         self.action_size = flatdim(action_space)
         self.obs_space = obs_space
         self.action_space = action_space
-        
+
         if discrete_policy:
             self.model = Policy_discrete(
                 obs_space, action_space, hidden_size, base_kwargs={"recurrent": recurrent_policy},

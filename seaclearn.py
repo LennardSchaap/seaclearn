@@ -3,69 +3,112 @@ from citylearn.wrappers import NormalizedObservationWrapper, DiscreteActionWrapp
 import torch
 import os
 import datetime
+import json
 
+from typing import List, Mapping, Tuple
+
+from citylearn.citylearn import CityLearnEnv
 from envs import make_env, make_vec_envs
 from a2c import A2C
 
-import matplotlib
+from matplotlib import ticker
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
+import pandas as pd
 
 from citylearn.citylearn import EvaluationCondition
+from citylearn.data import DataSet
 
 config = {
     # Dataset information
-    # "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
-    "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
+    "dataset_name": "data/citylearn_challenge_2022_phase_1/schema.json",
+    # "dataset_name": "data/citylearn_challenge_2022_phase_1_normalized_period/schema.json",
     "num_procs": 4,
     "seed": 42,
 
     # RL params
+    'lr' : 5e-5,
     "hidden_size" : 256,
-    "gamma": 0.99,
+    "gamma": 0.9, #was 0.99
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
-    'random_warmup_steps': 1000,
+    'random_warmup_steps': 0,
 
     # Training params
-    "entropy_coef": 0.01,
+    "entropy_coef": 0.1,
     "value_loss_coef": 0.1,
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
 
     # Environment settings
-    "num_steps": 700,
-
-    "num_env_steps": 7000000,
-
+    "num_steps": 24,
+    "num_env_steps": 100000,
+    
     "recurrent_policy": False,
     "discrete_policy": False,
     "default_bin_size": 3, # only used if discrete_policy is True
-}
 
-evaluate = False
+    'normalize_observations': True
+}
 
 # Environment wrappers
 wrappers = []
 
-if config['discrete_policy'] and not evaluate:
+if config['normalize_observations']:
+    wrappers.append(NormalizedObservationWrapper)
+
+if config['discrete_policy']:
     wrappers.append(DiscreteActionWrapperFix)
-elif config['discrete_policy'] and evaluate:
+elif config['discrete_policy']:
     wrappers.append(DiscreteActionWrapper)
 else:
-    if not evaluate:
-        wrappers.append(FlattenAction)
-if not evaluate:
-    wrappers.append(FlattenObservation)
+    wrappers.append(FlattenAction)
+
+wrappers.append(FlattenObservation)
+
+def set_active_observations(
+    schema: dict, active_observations: List[str]
+) -> dict:
+    """Set the observations that will be part of the environment's
+    observation space that is provided to the control agent.
+
+    Parameters
+    ----------
+    schema: dict
+        CityLearn dataset mapping used to construct environment.
+    active_observations: List[str]
+        Names of observations to set active to be passed to control agent.
+
+    Returns
+    -------
+    schema: dict
+        CityLearn dataset mapping with active observations set.
+    """
+
+    active_count = 0
+
+    for o in schema['observations']:
+        if o in active_observations:
+            schema['observations'][o]['active'] = True
+            active_count += 1
+        else:
+            schema['observations'][o]['active'] = False
+
+    valid_observations = list(schema['observations'].keys())
+    assert active_count == len(active_observations),\
+        'the provided observations are not all valid observations.'\
+          f' Valid observations in CityLearn are: {valid_observations}'
+
+    return schema
 
 # Initialize agents
 def init_agents(envs, obs):
 
     agents = [
-        A2C(i, osp, asp, hidden_size=config['hidden_size'], num_processes=config['num_procs'], num_steps=config['num_steps'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
+        A2C(i, osp, asp, lr=config['lr'], hidden_size=config['hidden_size'], num_processes=config['num_procs'], num_steps=config['num_steps'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space))
     ]
 
@@ -74,7 +117,6 @@ def init_agents(envs, obs):
         agents[i].storage.to(config['device'])
 
     return agents
-
 
 # Train agents
 def train(agents, envs):
@@ -100,10 +142,9 @@ def train(agents, envs):
             if 1 < j < config['random_warmup_steps']:
 
                 # Sample random actions
-                if config['discrete_policy']:
-                    with torch.no_grad():
-                        n_action = torch.tensor(np.array([[a.sample() for _ in range(config['num_procs'])] for a in envs.action_space]))                        
-                    obs, reward, done, infos = envs.step(n_action)
+                with torch.no_grad():
+                    n_action = torch.tensor(np.array([[a.sample() for _ in range(config['num_procs'])] for a in envs.action_space]))                        
+                obs, reward, done, infos = envs.step(n_action)
 
             else:
                 # Sample actions
@@ -187,7 +228,6 @@ def train(agents, envs):
     print('Finished training at:', datetime.datetime.now())
     return agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards
 
-
 # Save agent models
 def save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name):
 
@@ -237,142 +277,64 @@ def load_agents(envs, name, evaluation = False):
 
     agents = []
     for i, (osp, asp) in enumerate(zip(envs.observation_space, envs.action_space)):
-        agent = A2C(i, osp, asp, hidden_size=config['hidden_size'], num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
+        agent = A2C(i, osp, asp, lr=config['lr'], hidden_size=config['hidden_size'], num_processes=config['num_procs'], recurrent_policy=config['recurrent_policy'], discrete_policy=config['discrete_policy'], default_bin_size=config['default_bin_size'])
         model_path = f"{save_dir}/agent{i}"
         agent.restore(model_path)
         agents.append(agent)
 
     return agents
 
-# Evaluate function without vectorized envs
-def evaluate_single_env(env, agents, render=False, animation=False):
-    
-    # Evaluation settings
-    evaluation_steps = 1000
-    render_freq = 10
-
-    obs = env.reset()
-    obs = torch.tensor(obs, dtype=torch.float32)
-    
-    # Initialize recurrent hidden states and masks for recurrent policies
-    n_recurrent_hidden_states = [
-        torch.zeros(
-            evaluation_steps, agent.model.recurrent_hidden_state_size, device=config['device']
-        )
-        for agent in agents
-    ]
-    masks = torch.zeros(evaluation_steps, 1, device=config['device'])
-    
-    frames = []
-    for j in range(evaluation_steps):
-        
-        n_actions = []
-        for i, agent in enumerate(agents):
-            with torch.no_grad():
-                n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks, deterministic=True)
-                n_actions.append(n_action)
-
-        n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
-        obs, rewards, done, info = env.step(n_actions)
-        obs = torch.tensor(obs, dtype=torch.float32)
-
-        print("Actions: ", n_actions)
-        print("Electrical storages:")
-        elec_storage_index = env.observation_names[0].index('electrical_storage_soc')
-        for ob in obs:
-            print(ob[elec_storage_index])
-
-        if render and not j % render_freq:
-            frame_data = env.render()
-            frames.append(frame_data)
-
-    print("Done evaluating.")
-
-    if render:
-        for frame_data in frames:
-            plt.imshow(frame_data)
-            plt.pause(0.01)
-            plt.draw()
-        plt.show()
-
-    if animation:
-        print("Creating animation...")
-        fig, ax = plt.subplots()
-        ax.axis('off')
-        anim = FuncAnimation(fig, lambda x: plt.imshow(frames[x], animated=True), frames=len(frames), blit=False)
-        anim.save("evaluation.mp4", writer="ffmpeg")
-        plt.show()
-        print("Animation created.")
-
-    # Evaluate agents and generate cost function values
-    kpis = env.evaluate(baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV)
-    kpis = kpis.pivot(index='cost_function', columns='name', values='value')
-    kpis = kpis.dropna(how='all')
-    print(kpis)
-
-    env.close()
-
 def main():
 
     nr_runs = 1
 
-    if not evaluate:
+    now = datetime.datetime.now()
+    name = "SEAC_" + now.strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"Training new agent: {name}")
+    save_config(config, name)
 
-        now = datetime.datetime.now()
-        name = "SEAC_" + now.strftime("%Y-%m-%d_%H-%M-%S")
-        print(f"Training new agent: {name}")
-        save_config(config, name)
+    f = open('data/citylearn_challenge_2022_phase_1/schema.json')
+    schema = json.load(f)
+    schema['root_directory'] = './data/citylearn_challenge_2022_phase_1'
 
-        for run_nr in range(nr_runs):
-            
-            print("Starting run number:", run_nr)
+    active_observations = ["month",
+                           "day_type",
+                           "hour",
+                           "solar_generation",
+                           "electrical_storage_soc",
+                           "net_electricity_consumption",
+                           "electricity_pricing"]
 
-            # Make vectorized envs
-            torch.set_num_threads(1)
-            envs = make_vec_envs(env_name=config['dataset_name'],
-                                parallel=config['num_procs'],
-                                time_limit=None, # time_limit=time_limit,
-                                wrappers=wrappers,
-                                default_bin_size=config['default_bin_size'],
-                                device=config['device'],
-                                monitor_dir=None
-                                )
+    schema = set_active_observations(schema, active_observations)
 
-            obs = envs.reset()
+    for run_nr in range(nr_runs):
+        
+        print("Starting run number:", run_nr)
 
-            # Initialize agents
-            agents = init_agents(envs, obs)
+        # Make vectorized envs
+        torch.set_num_threads(1)
+        envs = make_vec_envs(env_name=schema,
+                            parallel=config['num_procs'],
+                            time_limit=None, # time_limit=time_limit,
+                            wrappers=wrappers,
+                            default_bin_size=config['default_bin_size'],
+                            device=config['device'],
+                            monitor_dir=None
+                            )
 
-            # Train models
-            agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards = train(agents, envs)
+        obs = envs.reset()
 
-            # Save trained models
-            save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name)
-            print("Saved agent.")
+        # Initialize agents
+        agents = init_agents(envs, obs)
 
-            envs.close()
+        # Train models
+        agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards = train(agents, envs)
 
-    else:
+        # Save trained models
+        save_results(agents, policy_losses, value_losses, dist_entropies, importance_samplings, seac_policy_losses, seac_value_losses, rewards, run_nr, name)
+        print("Saved agent.")
 
-        name = "SEAC_2023-12-02_22-26-17" # name of the model to load
-
-        render = False
-        animation = False
-
-        env = make_env(env_name = config['dataset_name'],
-                       rank = 1,
-                       time_limit=None,
-                       wrappers = wrappers,
-                       default_bin_size=config['default_bin_size'],
-                       monitor_dir = None
-                       )
-
-        print("Loading agents...")
-        agents = load_agents(env, name, evaluation = True)
-        print("Agents loaded!")
-
-        print("Evaluating...")
-        evaluate_single_env(env, agents, render=render, animation=animation)
+        envs.close()
 
 if __name__ == '__main__':
     main()
