@@ -34,8 +34,6 @@ class CustomReward(RewardFunction):
 
         super().__init__(env)
 
-
-
     def calculate(self, observations: List[Mapping[str, Union[int, float]]]) -> List[float]:
         r"""Returns reward for most recent action.
 
@@ -89,7 +87,7 @@ def make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_dir
 
     return env
 
-def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_dir, random_start = False, evaluate = False):
+def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_dir, random_start = False, evaluate = False, custom_reward = False):
 
     def _thunk():
 
@@ -99,7 +97,8 @@ def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_di
         end_pos = 7700
 
         env = CityLearnEnv(env_name, central_agent=False, simulation_start_time_step=start_pos, simulation_end_time_step=end_pos)
-        env.reward_function = CustomReward(env)
+        if custom_reward:
+            env.reward_function = CustomReward(env)
 
         if time_limit:
             env = TimeLimit(env, time_limit)
@@ -117,10 +116,10 @@ def _make_env(env_name, rank, time_limit, wrappers, default_bin_size, monitor_di
     return _thunk
 
 def make_vec_envs(
-    env_name, parallel, time_limit, wrappers, default_bin_size, device, monitor_dir=None
+    env_name, parallel, time_limit, wrappers, default_bin_size, device, monitor_dir=None, custom_reward = False
 ):
     envs = [
-        _make_env(env_name, i, time_limit, wrappers, default_bin_size, monitor_dir) for i in range(parallel)
+        _make_env(env_name, i, time_limit, wrappers, default_bin_size, monitor_dir, custom_reward = custom_reward) for i in range(parallel)
     ]
 
     if len(envs) == 1 or monitor_dir:
