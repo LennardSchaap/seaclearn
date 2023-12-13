@@ -30,7 +30,7 @@ config = {
     # RL params
     'lr' : 5e-5,
     "hidden_size" : 256,
-    "gamma": 0.9, #was 0.99
+    "gamma": 0.99, #was 0.99
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
@@ -38,7 +38,7 @@ config = {
     'reward_scale': 5,
 
     # Training params
-    "entropy_coef": 0.1,
+    "entropy_coef": 10.0,
     "value_loss_coef": 0.1,
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
