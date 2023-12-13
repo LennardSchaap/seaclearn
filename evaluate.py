@@ -5,11 +5,16 @@ from a2c import A2C
 import torch
 from matplotlib import ticker
 import matplotlib.pyplot as plt
+import matplotlib
+# matplotlib.use('TkAgg')
 from matplotlib.animation import FuncAnimation
 import numpy as np
 import pandas as pd
 from typing import List, Mapping, Tuple
 from citylearn.citylearn import EvaluationCondition
+import seaborn as sns
+import math
+from citylearn.citylearn import CityLearnEnv
 
 
 def read_config(name):
@@ -178,102 +183,151 @@ def plot_actions(actions_list: List[List[float]], title: str, env, config) -> pl
     return fig
 
 
-# def plot_building_kpis(envs: Mapping[str, CityLearnEnv]) -> plt.Figure:
-#     """Plots electricity consumption, cost and carbon emissions
-#     at the building-level for different control agents in bar charts.
+def get_kpis(env: CityLearnEnv) -> pd.DataFrame:
+    """Returns evaluation KPIs.
 
-#     Parameters
-#     ----------
-#     envs: Mapping[str, CityLearnEnv]
-#         Mapping of user-defined control agent names to environments
-#         the agents have been used to control.
+    Electricity consumption, cost and carbon emissions KPIs are provided
+    at the building-level and average district-level. Average daily peak,
+    ramping and (1 - load factor) KPIs are provided at the district level.
 
-#     Returns
-#     -------
-#     fig: plt.Figure
-#         Figure containing plotted axes.
-#     """
+    Parameters
+    ----------
+    env: CityLearnEnv
+        CityLearn environment instance.
 
-#     kpis_list = []
+    Returns
+    -------
+    kpis: pd.DataFrame
+        KPI table.
+    """
 
-#     for k, v in envs.items():
-#         kpis = get_kpis(v)
-#         kpis = kpis[kpis['level']=='building'].copy()
-#         kpis['building_id'] = kpis['name'].str.split('_', expand=True)[1]
-#         kpis['building_id'] = kpis['building_id'].astype(int).astype(str)
-#         kpis['env_id'] = k
-#         kpis_list.append(kpis)
+    kpis = env.evaluate(baseline_condition=EvaluationCondition.WITHOUT_STORAGE_BUT_WITH_PARTIAL_LOAD_AND_PV)
 
-#     kpis = pd.concat(kpis_list, ignore_index=True, sort=False)
-#     kpi_names= kpis['kpi'].unique()
-#     column_count_limit = 3
-#     row_count = math.ceil(len(kpi_names)/column_count_limit)
-#     column_count = min(column_count_limit, len(kpi_names))
-#     building_count = len(kpis['name'].unique())
-#     env_count = len(envs)
-#     figsize = (3.0*column_count, 0.3*env_count*building_count*row_count)
-#     fig, _ = plt.subplots(
-#         row_count, column_count, figsize=figsize, sharey=True
-#     )
+    # names of KPIs to retrieve from evaluate function
+    kpi_names = [
+        'electricity_consumption_total', 'cost_total', 'carbon_emissions_total',
+        'daily_peak_average', 'ramping_average', 'monthly_one_minus_load_factor_average'
+    ]
+    kpis = kpis[
+        (kpis['cost_function'].isin(kpi_names))
+    ].dropna()
 
-#     for i, (ax, (k, k_data)) in enumerate(zip(fig.axes, kpis.groupby('kpi'))):
-#         sns.barplot(x='value', y='name', data=k_data, hue='env_id', ax=ax)
-#         ax.axvline(1.0, color='black', linestyle='--', label='Baseline')
-#         ax.set_xlabel(None)
-#         ax.set_ylabel(None)
-#         ax.set_title(k)
+    # round up the values to 3 decimal places for readability
+    kpis['value'] = kpis['value'].round(3)
 
-#         if i == len(kpi_names) - 1:
-#             ax.legend(
-#                 loc='upper left', bbox_to_anchor=(1.3, 1.0), framealpha=0.0
-#             )
-#         else:
-#             ax.legend().set_visible(False)
+    # rename the column that defines the KPIs
+    kpis = kpis.rename(columns={'cost_function': 'kpi'})
 
-#         for s in ['right','top']:
-#             ax.spines[s].set_visible(False)
-
-#         for p in ax.patches:
-#             ax.text(
-#                 p.get_x() + p.get_width(),
-#                 p.get_y() + p.get_height()/2.0,
-#                 p.get_width(), ha='left', va='center'
-#             )
-
-#     plt.tight_layout()
-#     return fig
+    return kpis
 
 
-# def plot_simulation_summary(envs: Mapping[str, CityLearnEnv]):
-#     """Plots KPIs, load and battery SoC profiles for different control agents.
+def plot_building_kpis(envs: Mapping[str, CityLearnEnv]) -> plt.Figure:
+    """Plots electricity consumption, cost and carbon emissions
+    at the building-level for different control agents in bar charts.
 
-#     Parameters
-#     ----------
-#     envs: Mapping[str, CityLearnEnv]
-#         Mapping of user-defined control agent names to environments
-#         the agents have been used to control.
-#     """
+    Parameters
+    ----------
+    envs: Mapping[str, CityLearnEnv]
+        Mapping of user-defined control agent names to environments
+        the agents have been used to control.
 
-#     _ = plot_building_kpis(envs)
-#     print('Building-level KPIs:')
-#     plt.show()
-#     _ = plot_building_load_profiles(envs)
-#     print('Building-level load profiles:')
-#     plt.show()
-#     _ = plot_battery_soc_profiles(envs)
-#     print('Battery SoC profiles:')
-#     plt.show()
-#     _ = plot_district_kpis(envs)
-#     print('District-level KPIs:')
-#     plt.show()
-#     print('District-level load profiles:')
-#     _ = plot_district_load_profiles(envs)
-#     plt.show()
+    Returns
+    -------
+    fig: plt.Figure
+        Figure containing plotted axes.
+    """
+
+    kpis_list = []
+
+    for k, v in envs.items():
+        kpis = get_kpis(v)
+        kpis = kpis[kpis['level']=='building'].copy()
+        kpis['building_id'] = kpis['name'].str.split('_', expand=True)[1]
+        kpis['building_id'] = kpis['building_id'].astype(int).astype(str)
+        kpis['env_id'] = k
+        kpis_list.append(kpis)
+
+    kpis = pd.concat(kpis_list, ignore_index=True, sort=False)
+    kpi_names= kpis['kpi'].unique()
+    column_count_limit = 3
+    row_count = math.ceil(len(kpi_names)/column_count_limit)
+    column_count = min(column_count_limit, len(kpi_names))
+    building_count = len(kpis['name'].unique())
+    env_count = len(envs)
+    figsize = (3.0*column_count, 0.3*env_count*building_count*row_count)
+    fig, _ = plt.subplots(
+        row_count, column_count, figsize=figsize, sharey=True
+    )
+
+    for i, (ax, (k, k_data)) in enumerate(zip(fig.axes, kpis.groupby('kpi'))):
+        sns.barplot(x='value', y='name', data=k_data, hue='env_id', ax=ax)
+        ax.axvline(1.0, color='black', linestyle='--', label='Baseline')
+        ax.set_xlabel(None)
+        ax.set_ylabel(None)
+        ax.set_title(k)
+
+        if i == len(kpi_names) - 1:
+            ax.legend(
+                loc='upper left', bbox_to_anchor=(1.3, 1.0), framealpha=0.0
+            )
+        else:
+            ax.legend().set_visible(False)
+
+        for s in ['right','top']:
+            ax.spines[s].set_visible(False)
+
+        for p in ax.patches:
+            ax.text(
+                p.get_x() + p.get_width(),
+                p.get_y() + p.get_height()/2.0,
+                p.get_width(), ha='left', va='center'
+            )
+
+    plt.tight_layout()
+    return fig
+
+
+def plot_simulation_summary(envs: Mapping[str, CityLearnEnv]):
+    """Plots KPIs, load and battery SoC profiles for different control agents.
+
+    Parameters
+    ----------
+    envs: Mapping[str, CityLearnEnv]
+        Mapping of user-defined control agent names to environments
+        the agents have been used to control.
+    """
+
+    _ = plot_building_kpis(envs)
+    save_figs(envs, 'building_kpis')
+    print('Saved building-level KPIs...')
+
+    # _ = plot_building_load_profiles(envs)
+    # save_figs(envs, 'building_load_profiles')
+    # print('Saved building-level load profiles...')
+
+    # _ = plot_battery_soc_profiles(envs)
+    # save_figs(envs, 'battery_soc_profiles')
+    # print('Saved battery SoC profiles...')
+
+    # _ = plot_district_kpis(envs)
+    # save_figs(envs, 'district_kpis')
+    # print('Saved district-level KPIs...')
+
+    # _ = plot_district_load_profiles(envs)
+    # save_figs(envs, 'district_load_profiles')
+    # print('Saved district-level load profiles...')
+
+
+def save_figs(envs, plot_name):
+    
+    for k, v in envs.items():
+        plt.savefig(f'results/{k}/plots/{plot_name}.png')
+        plt.close()
 
 
 def main():
 
-    name = "3DiscNoRec5mil512Hidden" # name of the model to load
+    name = "Normalized" # name of the model to load
     render = False
     animation = False
 
@@ -303,6 +357,11 @@ def main():
         title = 'Continuous Actions'
     fig = plot_actions(action_list[:97], title, env, config)
     plt.savefig(f'results/{name}/plots/actions.png', dpi=300, bbox_inches='tight')
+    print("Actions plot saved.")
+
+    print("Plotting KPIs...")
+    plot_simulation_summary({name: env})
+
 
 if __name__ == "__main__":
     main()
