@@ -43,6 +43,7 @@ config = {
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
+    "custom_reward": True,
 
     # Environment settings
     "num_steps": 24,
@@ -333,7 +334,8 @@ def main():
                             wrappers=wrappers,
                             default_bin_size=config['default_bin_size'],
                             device=config['device'],
-                            monitor_dir=None
+                            monitor_dir=None,
+                            custom_reward=config['custom_reward']
                             )
 
         obs = envs.reset()
