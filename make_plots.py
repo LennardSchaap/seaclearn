@@ -137,7 +137,7 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
-    names = ['SEAC_2023-12-13_15-56-38'] # testing
+    names = ['SEAC_2023-12-01_14-28-43'] # testing
 
     smooth_data = False
     window_size = 100
