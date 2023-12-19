@@ -30,7 +30,7 @@ config = {
     # RL params
     'lr' : 5e-5,
     "hidden_size" : 256,
-    "gamma": 0.9, #was 0.99
+    "gamma": 0.90, #was 0.99
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
@@ -43,7 +43,7 @@ config = {
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
-    "custom_reward": True,
+    "custom_reward": False,
 
     # Environment settings
     "num_steps": 100,

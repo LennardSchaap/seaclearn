@@ -135,9 +135,9 @@ def read_marlisa_results():
 def main():
 
     names = os.listdir('/home/s1914839/data1/results/')
-    names.remove('all_plots.png')
+    
 
-    names = ['SEAC_2023-12-13_16-03-37'] # testing
+    names = ['SEAC_2023-12-13_16-46-41'] # testing
 
     smooth_data = False
     window_size = 100
