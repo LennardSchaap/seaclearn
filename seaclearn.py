@@ -28,8 +28,8 @@ config = {
     "seed": 42,
 
     # RL params
-    'lr' : 5e-5,
-    "hidden_size" : 256,
+    'lr' : 3e-4,
+    "hidden_size" : 64,
     "gamma": 0.99, #was 0.99
     "use_gae": False,
     "gae_lambda": 0.95,
@@ -38,15 +38,15 @@ config = {
     'reward_scale': 5,
 
     # Training params
-    "entropy_coef": 10.0,
-    "value_loss_coef": 0.1,
+    "entropy_coef": 0.01,
+    "value_loss_coef": 0.5,
     "seac_coef": 1.0,
     "max_grad_norm": 0.5,
     "device": "cpu",
     "custom_reward": True,
 
     # Environment settings
-    "num_steps": 100,
+    "num_steps": 5,
     "num_env_steps": 100000,
     
     "recurrent_policy": False,
