@@ -218,6 +218,35 @@ def plot_actions(actions_list: List[List[float]], title: str, env, config) -> pl
     return fig
 
 
+def plot_actions_hist(actions_list: List[List[float]], title: str, env, config) -> plt.Figure:
+    # use different color for each building and use subplots
+    # to plot the histograms for each building
+    # use the same range for all plots
+
+    fig, axs = plt.subplots(1, len(env.buildings), figsize=(6, 3), sharey=True)
+    columns = [b.name.replace('', ' ') for b in env.buildings]
+    plot_data = pd.DataFrame(actions_list, columns=columns)
+
+    if config['discrete_policy']:
+        bins = config['default_bin_size'] + 1
+    else:
+        bins = 50
+
+    # use different color for each building
+    for i, (ax, c) in enumerate(zip(axs, plot_data.columns)):
+        ax.hist(plot_data[c], bins=bins, color=f'C{i}', density=True, range=(min(plot_data.min()), max(plot_data.max())))
+        ax.set_xlabel(r'Actions')
+        ax.set_title(c)
+
+        if i == 0:
+            ax.set_ylabel('Frequency')
+
+    fig.suptitle(title)
+    plt.tight_layout()
+
+    return fig
+
+
 def get_kpis(env: CityLearnEnv) -> pd.DataFrame:
     """Returns evaluation KPIs.
 
@@ -404,7 +433,10 @@ def main():
         title = 'Discrete Actions'
     else:
         title = 'Continuous Actions'
-    fig = plot_actions(action_list[:97], title, env, config)
+
+    fig = plot_actions_hist(action_list, title, env, config)
+    plt.savefig(f'results/{name}/plots/actions_hist.png', dpi=300, bbox_inches='tight')
+    fig = plot_actions(action_list, title, env, config)
     plt.savefig(f'results/{name}/plots/actions.png', dpi=300, bbox_inches='tight')
     print("Actions plot saved.")
 
