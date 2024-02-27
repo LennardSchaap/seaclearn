@@ -82,10 +82,10 @@ def plot(names, smooth_data=False, window_size=100):
 
 
     # plot marlisa results as extra line in the reward plot
-    marlisa_reward = read_marlisa_results()
-    if smooth_data:
-        marlisa_reward = smooth(marlisa_reward, window_size)
-    axs[0].plot(marlisa_reward[:len(mean_rewards)], color='black', label='MARLISA')
+    # marlisa_reward = read_marlisa_results()
+    # if smooth_data:
+    #     marlisa_reward = smooth(marlisa_reward, window_size)
+    # axs[0].plot(marlisa_reward[:len(mean_rewards)], color='black', label='MARLISA')
 
     axs[0].legend()
     axs[1].legend()
@@ -137,10 +137,10 @@ def main():
     names = os.listdir('results/')
     names.remove('all_plots.png')
 
-    names = ['SEAC_2023-12-24_14-25-43'] # testing
+    names = ['SEAC_2024-02-27_12-03-37'] # testing
 
-    smooth_data = False
-    window_size = 100
+    smooth_data = True
+    window_size = 10
     plot(names, smooth_data, window_size)
 
 

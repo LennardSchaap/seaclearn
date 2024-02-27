@@ -107,7 +107,7 @@ def load_agents(envs, name, config):
 def evaluate_single_env(env, agents, config, render=False, animation=False):
     
     # Evaluation settings
-    evaluation_steps = 1000
+    evaluation_steps = 100
     render_freq = 10
 
     obs = env.reset()
@@ -132,8 +132,8 @@ def evaluate_single_env(env, agents, config, render=False, animation=False):
                 n_value, n_action, n_action_log_prob, n_recurrent_hidden_states[i] = agent.model.act(obs[i], n_recurrent_hidden_states[i], masks, deterministic=True)
                 n_actions.append(n_action)
 
-        n_actions = [tensor.detach().cpu().numpy() for tensor in n_actions]
-        action_list.append(n_actions)
+        n_actions = np.array([tensor.detach().cpu().numpy() for tensor in n_actions])
+        action_list.append(n_actions.flatten())
 
         obs, rewards, done, info = env.step(n_actions)
         obs = torch.tensor(obs, dtype=torch.float32)
@@ -224,7 +224,7 @@ def plot_actions_hist(actions_list: List[List[float]], title: str, env, config) 
     # use the same range for all plots
 
     fig, axs = plt.subplots(1, len(env.buildings), figsize=(6, 3), sharey=True)
-    columns = [b.name.replace('', ' ') for b in env.buildings]
+    columns = [b.name.replace('_', ' ') for b in env.buildings]
     plot_data = pd.DataFrame(actions_list, columns=columns)
 
     if config['discrete_policy']:
@@ -234,7 +234,7 @@ def plot_actions_hist(actions_list: List[List[float]], title: str, env, config) 
 
     # use different color for each building
     for i, (ax, c) in enumerate(zip(axs, plot_data.columns)):
-        ax.hist(plot_data[c], bins=bins, color=f'C{i}', density=True, range=(min(plot_data.min()), max(plot_data.max())))
+        ax.hist(plot_data[c], color=f'C{i}', bins=bins, density=True, range=(min(plot_data.min()), max(plot_data.max())))
         ax.set_xlabel(r'Actions')
         ax.set_title(c)
 
@@ -391,7 +391,7 @@ def save_figs(envs, plot_name):
 
 def main():
 
-    name = "SEAC_2023-12-24_14-25-43" # name of the model to load
+    name = "SEAC_2024-02-27_12-03-37" # name of the model to load
     render = False
     animation = False
 

@@ -34,8 +34,8 @@ config = {
     "use_gae": False,
     "gae_lambda": 0.95,
     "use_proper_time_limits": True,
-    'random_warmup_steps': 1000,
-    'reward_scale': 5,
+    'random_warmup_steps': 0,
+    'reward_scale': 1,
 
     # Training params
     "entropy_coef": 0.01,
@@ -171,7 +171,6 @@ def train(agents, envs):
                     )
 
                 obs, reward, done, infos = envs.step(n_action)
-                print(n_action)
                 
                 if j > config['random_warmup_steps'] and config['random_warmup_steps'] != 0:
                     
@@ -229,11 +228,11 @@ def train(agents, envs):
         seac_value_losses.append(total_value_loss)
         rewards.append(np.array(reward).sum(axis=1).mean())
 
-        # if j & 100 == 0:
-        #     print("Mean reward: ", np.array(reward).sum(axis=1).mean())
-        #     print("Policy loss: ", total_policy_loss)
-        #     print("Value loss: ", total_value_loss)
-        #     print("Total loss?: ", total_policy_loss + total_value_loss - total_dist_entropy + total_seac_policy_loss + total_seac_value_loss)
+        if j % 10 == 0:
+            print("Mean reward: ", np.array(reward).sum(axis=1).mean())
+            print("Policy loss: ", total_policy_loss)
+            print("Value loss: ", total_value_loss)
+            print("Total loss?: ", total_policy_loss + total_value_loss - total_dist_entropy + total_seac_policy_loss + total_seac_value_loss)
         
         for agent in agents:
             agent.storage.after_update()

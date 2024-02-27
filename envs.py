@@ -54,16 +54,15 @@ class CustomReward(RewardFunction):
             Reward for transition to current timestep.
         """
 
-        rewards = []
+        electricity_consumption=[o['net_electricity_consumption'] for o in observations]
+        carbon_emission=[o['carbon_intensity']*o['net_electricity_consumption'] for o in observations]
+        electricity_price=[o['electricity_pricing']*o['net_electricity_consumption'] for o in observations]
 
-        for o in observations:
-            cost = o['net_electricity_consumption']
-            battery_soc = o['electrical_storage_soc']
-            penalty = -(1.0 + np.sign(cost) * battery_soc)
-            reward = penalty * abs(cost)
-            rewards.append(reward)
+        electricity_price = np.array(electricity_price).clip(0.) + (-np.array(electricity_price)).clip(0.) * 0.3
+        carbon_emission = np.array(carbon_emission).clip(0.) + (-np.array(carbon_emission)).clip(0.) * 0.3
+        reward = -(electricity_price + carbon_emission)
 
-        return rewards
+        return reward
 
 class MADummyVecEnv(DummyVecEnv):
     def __init__(self, env_fns):
