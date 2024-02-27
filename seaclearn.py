@@ -171,6 +171,7 @@ def train(agents, envs):
                     )
 
                 obs, reward, done, infos = envs.step(n_action)
+                print(n_action)
                 
                 if j > config['random_warmup_steps'] and config['random_warmup_steps'] != 0:
                     

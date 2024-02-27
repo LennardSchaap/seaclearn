@@ -362,7 +362,7 @@ def save_figs(envs, plot_name):
 
 def main():
 
-    name = "SEAC_2023-12-01_14-28-43" # name of the model to load
+    name = "SEAC_2023-12-24_14-25-43" # name of the model to load
     render = False
     animation = False
 
